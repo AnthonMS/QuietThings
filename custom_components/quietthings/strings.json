@@ -1,0 +1,74 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect the TV",
+        "description": "Enter a name, the TV address and the QuietThings API token. The TV MAC address and the Wake-on-LAN broadcast address are detected automatically.",
+        "data": {
+          "name": "Name",
+          "host": "Host",
+          "api_port": "QuietThings API port",
+          "api_token": "QuietThings API token"
+        }
+      },
+      "mac": {
+        "title": "TV MAC address",
+        "description": "The MAC address of the TV could not be detected. Enter it (for example aa:bb:cc:dd:ee:ff); it is used to wake the TV.",
+        "data": {
+          "mac": "TV MAC address"
+        }
+      },
+      "pair": {
+        "title": "Pair with the TV",
+        "description": "Select Submit, then choose Allow on the TV within 60 seconds."
+      },
+      "reauth_confirm": {
+        "title": "QuietThings API token rejected",
+        "description": "Enter the current QuietThings API token.",
+        "data": {
+          "api_token": "QuietThings API token"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not reach the TV or the QuietThings API.",
+      "invalid_auth": "The QuietThings API token was rejected.",
+      "unsupported_api": "The TV reports QuietThings API version {version}; this integration needs {supported}.",
+      "name_required": "Enter a name for the TV.",
+      "invalid_mac": "Enter a valid MAC address.",
+      "invalid_broadcast": "Enter a valid IPv4 broadcast address.",
+      "pairing_failed": "The TV did not confirm pairing. Try again and choose Allow."
+    },
+    "abort": {
+      "already_configured": "This TV is already configured.",
+      "reauth_successful": "The token was updated."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "QuietThings options",
+        "data": {
+          "scan_interval": "Poll interval (seconds)",
+          "mac": "TV MAC address",
+          "broadcast": "Broadcast address"
+        }
+      }
+    },
+    "error": {
+      "invalid_mac": "Enter a valid MAC address.",
+      "invalid_broadcast": "Enter a valid IPv4 broadcast address."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "input_signal": {
+        "state": {
+          "active": "Active",
+          "no_signal": "No signal",
+          "unknown": "Unknown"
+        }
+      }
+    }
+  }
+}

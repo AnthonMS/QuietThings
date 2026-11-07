@@ -1,0 +1,7 @@
+# Target box runs Home Assistant core 2026.11.0, but no pytest-homeassistant-custom-component
+# release targets it yet. 0.13.375 (newest, pinned to core 2026.10.4) does not import against
+# 2026.11.0, so the suite runs on core 2026.10.4. Linux only (core needs fcntl); Python >= 3.14.
+pytest-homeassistant-custom-component==0.13.375
+homeassistant==2026.10.4
+# Same pin as core 2026.11.0 homeassistant/components/samsungtvws manifest (samsungtv)
+samsungtvws[async,encrypted]==3.0.7

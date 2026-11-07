@@ -1,0 +1,38 @@
+"""Constants for the QuietThings integration."""
+
+from __future__ import annotations
+
+DOMAIN = "quietthings"
+
+CONF_NAME = "name"
+CONF_HOST = "host"
+CONF_API_PORT = "api_port"
+CONF_API_TOKEN = "api_token"
+CONF_MAC = "mac"
+CONF_BROADCAST = "broadcast"
+CONF_WS_TOKEN = "ws_token"
+CONF_MODEL = "model"
+CONF_SCAN_INTERVAL = "scan_interval"
+
+DEFAULT_API_PORT = 18765
+DEFAULT_BROADCAST = "255.255.255.255"
+DEFAULT_SCAN_INTERVAL = 10
+MIN_SCAN_INTERVAL = 5
+MAX_SCAN_INTERVAL = 300
+
+STOCK_REST_PORT = 8001
+STOCK_WS_PORT = 8002
+WOL_PORT = 9
+WS_CLIENT_NAME = "QuietThings"
+
+PAIR_TIMEOUT = 60
+API_TIMEOUT = 5
+API_HDMI_TIMEOUT = 10
+SUPPORTED_API_VERSION = 1
+
+HDMI_PORTS = (1, 2, 3, 4)
+STOCK_FAILURES_BEFORE_UNAVAILABLE = 3
+
+SIGNAL_ACTIVE = "active"
+SIGNAL_NONE = "no_signal"
+SIGNAL_UNKNOWN = "unknown"

@@ -1,0 +1,17 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage
+htmlcov/
+.local/
+
+# Working notes stay local (home network details); only the release checklist is tracked
+notes/*
+!notes/public-release.md
+
+# Build output and secrets
+bin/
+obj/
+*.dll
+*.token

@@ -1,0 +1,34 @@
+name: Validate
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 3 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  hacs:
+    name: HACS validation
+    if: github.repository == 'magnetgrouplabs/QuietThings'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: HACS validation
+        uses: hacs/action@22.5.0
+        with:
+          category: integration
+
+  hassfest:
+    name: Hassfest
+    if: github.repository == 'magnetgrouplabs/QuietThings'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Hassfest validation
+        uses: home-assistant/actions/hassfest@master

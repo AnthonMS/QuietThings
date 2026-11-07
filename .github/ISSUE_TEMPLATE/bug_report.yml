@@ -1,0 +1,66 @@
+name: Bug report
+description: Something in QuietThings is not working as expected
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Never paste your API token or the token file. Diagnostics downloads already redact it.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+  - type: input
+    id: ha-version
+    attributes:
+      label: Home Assistant version
+    validations:
+      required: true
+  - type: input
+    id: qt-version
+    attributes:
+      label: QuietThings version
+      description: From HACS, or the version in custom_components/quietthings/manifest.json
+    validations:
+      required: true
+  - type: input
+    id: tv-model
+    attributes:
+      label: TV model
+  - type: input
+    id: quiettizen-version
+    attributes:
+      label: QuietTizen version or commit
+  - type: dropdown
+    id: predeploy
+    attributes:
+      label: Did the kit's predeploy checks pass?
+      options:
+        - "Yes"
+        - "No"
+        - Not sure
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log lines
+      description: |
+        You can also download diagnostics from the integration page and attach the file. The download redacts the API token.
+      render: shell
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Before submitting
+      options:
+        - label: I have removed my API token and any personal details
+          required: true
