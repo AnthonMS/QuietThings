@@ -68,7 +68,6 @@ def _user_schema(defaults: Mapping[str, Any]) -> vol.Schema:
             vol.Required(CONF_HOST, default=defaults.get(CONF_HOST, "")): str,
             vol.Required(
                 CONF_API_PORT,
-                CONF_PLAYBACK_PORT,
                 default=defaults.get(CONF_API_PORT, DEFAULT_API_PORT),
             ): vol.All(int, vol.Range(min=1, max=65535)),
             vol.Required(CONF_API_TOKEN, default=defaults.get(CONF_API_TOKEN, "")): str,

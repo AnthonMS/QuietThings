@@ -14,7 +14,7 @@
   "issue_tracker": "https://github.com/magnetgrouplabs/QuietThings/issues",
   "requirements": [
     "samsungtvws[async,encrypted]>=2.7.2,<4",
-    "async-timeout==5.0.1"
+    "async-timeout==4.0.3"
   ],
   "version": "2026.11.2"
 }
