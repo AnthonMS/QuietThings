@@ -171,6 +171,22 @@ async def test_diagnostics_omit_viewing_metadata(
     assert API_TOKEN not in str(result)
 
 
+async def test_rapid_pause_resume_refreshes_each_confirmed_state(
+    hass, mock_tv, config_entry, aioclient_mock
+):
+    _runtime, response = await setup_playback(
+        hass, config_entry, aioclient_mock, body("playing")
+    )
+    aioclient_mock.post(f"{BASE}/v1/command", json={"ok": True, "accepted": True})
+    # No clock advance: successive commands must not wait for HA's refresh cooldown.
+    for service, state in (("media_pause", "paused"), ("media_play", "playing")):
+        response["body"] = body(state)
+        await hass.services.async_call(
+            "media_player", service, {"entity_id": MP}, blocking=True
+        )
+        assert hass.states.get(MP).state == state
+
+
 @pytest.mark.parametrize(
     "change",
     [

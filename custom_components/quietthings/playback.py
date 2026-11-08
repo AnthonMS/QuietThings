@@ -169,4 +169,6 @@ class PlaybackCoordinator(DataUpdateCoordinator[PlaybackSample]):
             await self.api.command(action, position)
         except (QuietThingsError, ValueError) as err:
             raise HomeAssistantError("Playback command rejected") from err
-        await self.async_request_refresh()
+        # Commands need their own confirmed read, even inside HA's refresh cooldown.
+        # async_refresh retains the coordinator lock without debouncing this read.
+        await self.async_refresh()
