@@ -33,6 +33,7 @@ REAL_READ_ARP_MAC = netinfo.read_arp_mac
 ADAPTERS = [
     {
         "name": "eth0",
+        "enabled": True,
         "ipv4": [{"address": "192.0.2.5", "network_prefix": 24}],
         "ipv6": [],
     }
@@ -221,6 +222,7 @@ async def test_broadcast_computed_from_adapter(hass, detection):
     detection[1].return_value = [
         {
             "name": "eth0",
+        "enabled": True,
             "ipv4": [{"address": "192.0.2.1", "network_prefix": 24}],
             "ipv6": [],
         }

@@ -36,3 +36,7 @@ STOCK_FAILURES_BEFORE_UNAVAILABLE = 3
 SIGNAL_ACTIVE = "active"
 SIGNAL_NONE = "no_signal"
 SIGNAL_UNKNOWN = "unknown"
+
+# Zero disables the optional companion without sending extra requests.
+CONF_PLAYBACK_PORT = "playback_port"
+DEFAULT_PLAYBACK_PORT = 0

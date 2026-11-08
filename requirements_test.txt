@@ -5,3 +5,6 @@ pytest-homeassistant-custom-component==0.13.375
 homeassistant==2026.10.4
 # Same pin as core 2026.11.0 homeassistant/components/samsungtvws manifest (samsungtv)
 samsungtvws[async,encrypted]==3.0.7
+
+# Needed by samsungtvws 2.7.2 on the older supported HA target.
+async-timeout==5.0.1

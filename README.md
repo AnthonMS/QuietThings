@@ -40,7 +40,7 @@ when the launcher is not running.
 ## Requirements
 
 - A Samsung TV with Developer Mode and a working QuietTizen installation
-- Home Assistant 2026.10 or newer
+- Home Assistant 2026.5.4 or newer
 - The TV and Home Assistant connected to the same LAN
 
 QuietThings was developed using a Samsung QN90B, while QuietTizen itself was
@@ -96,7 +96,7 @@ The integration creates one device per TV.
 ## Behavior and limitations
 
 - The select entity and both sensors are unavailable if the most recent QuietThings API `/state` request failed.
-- The media player remains available for power control. A loss of communication with the stock port is reported as off. The media player becomes unavailable only after 3 consecutive failed stock polls while the API is also down.
+- The media player remains available for power control. A loss of communication with the stock port is reported as unknown; it does not prove that the TV is off. The media player becomes unavailable only after 3 consecutive failed stock polls while the API is also down.
 - The integration checks the API version during setup. A TV reporting a different version is not accepted.
 - Keep the API token private. Do not paste it into chats, logs, or issues. Diagnostic downloads redact it.
 - The API allows approximately 4 requests per second. Requests exceeding this rate receive a 429 response.
@@ -150,3 +150,8 @@ It is not affiliated with or endorsed by Samsung or the creators of QuietTizen.
 ## License
 
 MIT. See [LICENSE](LICENSE).
+
+
+## Experimental playback extension
+
+The development branch adds an optional playback companion for actual Moonfin/Jellyfin state and progress, stable TV entity identity across client-session changes, and conditional play/pause/stop/seek controls. The original API v1 remains unchanged. The companion is disabled by default and is not yet an accepted installed-TV release. See [experimental/playback/README.md](experimental/playback/README.md) for architecture, protocol, validation and remaining device tests.

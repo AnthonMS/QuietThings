@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import timedelta
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
@@ -12,6 +13,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from .api import QuietThingsApi
 from .const import (
     CONF_API_PORT,
+    CONF_PLAYBACK_PORT,
     CONF_API_TOKEN,
     CONF_BROADCAST,
     CONF_HOST,
@@ -24,6 +26,7 @@ from .const import (
 )
 from .coordinator import ApiCoordinator, StockCoordinator
 from .stock import StockTv
+from .playback import PlaybackApi, PlaybackCoordinator
 
 PLATFORMS = [Platform.MEDIA_PLAYER, Platform.SELECT, Platform.SENSOR]
 
@@ -36,6 +39,7 @@ class QuietThingsData:
     api: QuietThingsApi
     stock_coordinator: StockCoordinator
     api_coordinator: ApiCoordinator
+    playback_coordinator: PlaybackCoordinator | None = None
 
 
 type QuietThingsConfigEntry = ConfigEntry[QuietThingsData]
@@ -73,13 +77,23 @@ async def async_setup_entry(hass: HomeAssistant, entry: QuietThingsConfigEntry) 
     await stock_coordinator.async_refresh()
     await api_coordinator.async_refresh()
 
+    playback_coordinator = None
+    if port := entry.options.get(CONF_PLAYBACK_PORT, 0):
+        playback_api = PlaybackApi(session, data[CONF_HOST], port, data[CONF_API_TOKEN])
+        playback_coordinator = PlaybackCoordinator(
+            hass, entry, playback_api, timedelta(seconds=interval)
+        )
+        await playback_coordinator.async_refresh()
+
     entry.runtime_data = QuietThingsData(
-        stock, api, stock_coordinator, api_coordinator
+        stock, api, stock_coordinator, api_coordinator, playback_coordinator
     )
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: QuietThingsConfigEntry) -> bool:
+async def async_unload_entry(
+    hass: HomeAssistant, entry: QuietThingsConfigEntry
+) -> bool:
     """Unload a config entry."""
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)

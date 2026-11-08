@@ -18,6 +18,12 @@ from custom_components.quietthings.diagnostics import (
 
 from .conftest import API_TOKEN, DEVICE_ID, MAC, WS_TOKEN
 
+def get_device(registry, entry):
+    if hasattr(registry, "async_get_device_by_identifier"):
+        return registry.async_get_device_by_identifier(("quietthings", DEVICE_ID), entry.entry_id)
+    return registry.async_get_device(identifiers={("quietthings", DEVICE_ID)})
+
+
 MP = "media_player.living_room_tv"
 SEL = "select.living_room_tv_hdmi_input"
 CUR = "sensor.living_room_tv_current_input"
@@ -45,7 +51,7 @@ def api_posts(aioclient_mock):
 async def test_name_and_unique_ids(hass, mock_tv, setup_integration):
     entry = await setup_integration()
     assert entry.title == "Living Room TV"
-    device = dr.async_get(hass).async_get_device_by_identifier(("quietthings", DEVICE_ID), entry.entry_id)
+    device = get_device(dr.async_get(hass), entry)
     assert device.name == "Living Room TV"
     assert device.manufacturer == "Samsung"
     assert device.model == "QN65QN90BAFXZA"
@@ -65,7 +71,7 @@ async def test_name_and_unique_ids(hass, mock_tv, setup_integration):
 async def test_user_renames_survive_reload(hass, mock_tv, setup_integration):
     entry = await setup_integration()
     dev_reg = dr.async_get(hass)
-    device = dev_reg.async_get_device_by_identifier(("quietthings", DEVICE_ID), entry.entry_id)
+    device = get_device(dev_reg, entry)
     dev_reg.async_update_device(device.id, name_by_user="Den TV")
     er.async_get(hass).async_update_entity(SEL, name="Input picker")
 
@@ -284,12 +290,12 @@ async def test_api_availability_flips(hass, mock_tv, setup_integration):
     assert hass.states.get(MP).attributes["volume_level"] == 0.2
 
 
-async def test_stock_loss_means_off_not_unavailable(hass, mock_tv, setup_integration):
+async def test_stock_loss_is_unknown_when_api_remains_reachable(hass, mock_tv, setup_integration):
     entry = await setup_integration()
     mock_tv.stock_down = True
     for _ in range(5):
         await refresh(hass, entry, "stock")
-    assert hass.states.get(MP).state == "off"
+    assert hass.states.get(MP).state == "unknown"
     assert hass.states.get(SEL).state == "HDMI 2"
 
 
@@ -300,7 +306,7 @@ async def test_unavailable_only_when_stock_lost_3_polls_and_api_down(hass, mock_
     await refresh(hass, entry)
     await refresh(hass, entry, "stock")
     await refresh(hass, entry, "stock")
-    assert hass.states.get(MP).state == "off"
+    assert hass.states.get(MP).state == "unknown"
     await refresh(hass, entry, "stock")
     assert hass.states.get(MP).state == "unavailable"
 

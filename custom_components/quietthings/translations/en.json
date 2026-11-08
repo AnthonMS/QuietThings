@@ -51,7 +51,8 @@
         "data": {
           "scan_interval": "Poll interval (seconds)",
           "mac": "TV MAC address",
-          "broadcast": "Broadcast address"
+          "broadcast": "Broadcast address",
+          "playback_port": "Optional playback companion port (0 disables)"
         }
       }
     },

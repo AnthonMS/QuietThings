@@ -19,7 +19,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class StockCoordinator(DataUpdateCoordinator[dict[str, Any]]):
-    """Polls the stock REST interface. Never fails: loss means power off."""
+    """Polls stock REST, preserving unreachable as a distinct power observation."""
 
     def __init__(
         self,

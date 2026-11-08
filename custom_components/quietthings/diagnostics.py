@@ -18,7 +18,15 @@ async def async_get_config_entry_diagnostics(
 ) -> dict[str, Any]:
     """Return diagnostics for a config entry."""
     runtime = entry.runtime_data
+    playback = runtime.playback_coordinator
+    sample = playback.sample if playback else None
     return {
+        "playback": {
+            "enabled": playback is not None,
+            "available": sample is not None,
+            "state": sample.state if sample else None,
+            "adapter": sample.adapter if sample else None,
+        },
         "entry": async_redact_data(dict(entry.data), TO_REDACT),
         "options": dict(entry.options),
         "stock": async_redact_data(runtime.stock_coordinator.data or {}, TO_REDACT),

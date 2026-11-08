@@ -20,6 +20,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from .api import QuietThingsApi, QuietThingsAuthError, QuietThingsError
 from .const import (
     CONF_API_PORT,
+    CONF_PLAYBACK_PORT,
     CONF_API_TOKEN,
     CONF_BROADCAST,
     CONF_HOST,
@@ -66,7 +67,9 @@ def _user_schema(defaults: Mapping[str, Any]) -> vol.Schema:
             name_key: str,
             vol.Required(CONF_HOST, default=defaults.get(CONF_HOST, "")): str,
             vol.Required(
-                CONF_API_PORT, default=defaults.get(CONF_API_PORT, DEFAULT_API_PORT)
+                CONF_API_PORT,
+                CONF_PLAYBACK_PORT,
+                default=defaults.get(CONF_API_PORT, DEFAULT_API_PORT),
             ): vol.All(int, vol.Range(min=1, max=65535)),
             vol.Required(CONF_API_TOKEN, default=defaults.get(CONF_API_TOKEN, "")): str,
         }
@@ -136,9 +139,7 @@ class QuietThingsConfigFlow(ConfigFlow, domain=DOMAIN):
                     CONF_MODEL: device.get("modelName"),
                 }
                 self._stock = stock
-                mac = await async_detect_mac(
-                    self.hass, user_input[CONF_HOST], device
-                )
+                mac = await async_detect_mac(self.hass, user_input[CONF_HOST], device)
                 if mac is None:
                     return await self.async_step_mac()
                 return await self._finish_addressing(mac)
@@ -269,6 +270,8 @@ class QuietThingsOptionsFlow(OptionsFlowWithReload):
                 errors[CONF_BROADCAST] = "invalid_broadcast"
             if not errors:
                 options = {CONF_SCAN_INTERVAL: user_input[CONF_SCAN_INTERVAL]}
+                if playback_port := user_input.get(CONF_PLAYBACK_PORT, 0):
+                    options[CONF_PLAYBACK_PORT] = playback_port
                 data = {**entry.data, CONF_MAC: mac, CONF_BROADCAST: broadcast}
                 data_changed = data != dict(entry.data)
                 options_changed = options != dict(entry.options)
@@ -276,9 +279,7 @@ class QuietThingsOptionsFlow(OptionsFlowWithReload):
                     self.hass.config_entries.async_update_entry(entry, data=data)
                     if not options_changed:
                         # The automatic reload only fires on changed options.
-                        self.hass.config_entries.async_schedule_reload(
-                            entry.entry_id
-                        )
+                        self.hass.config_entries.async_schedule_reload(entry.entry_id)
                 return self.async_create_entry(data=options)
         source = user_input or {}
         current = source.get(
@@ -289,6 +290,12 @@ class QuietThingsOptionsFlow(OptionsFlowWithReload):
             step_id="init",
             data_schema=vol.Schema(
                 {
+                    vol.Optional(
+                        CONF_PLAYBACK_PORT,
+                        default=source.get(
+                            CONF_PLAYBACK_PORT, entry.options.get(CONF_PLAYBACK_PORT, 0)
+                        ),
+                    ): vol.All(int, vol.Range(min=0, max=65535)),
                     vol.Required(CONF_SCAN_INTERVAL, default=current): vol.All(
                         int, vol.Range(min=MIN_SCAN_INTERVAL, max=MAX_SCAN_INTERVAL)
                     ),

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from datetime import UTC, datetime
 from typing import Any
 
 from homeassistant.components.media_player import (
@@ -10,10 +11,12 @@ from homeassistant.components.media_player import (
     MediaPlayerEntity,
     MediaPlayerEntityFeature,
     MediaPlayerState,
+    MediaType,
 )
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import QuietThingsConfigEntry
@@ -65,6 +68,8 @@ class QuietThingsMediaPlayer(CoordinatorEntity[StockCoordinator], MediaPlayerEnt
         self._stock = runtime.stock
         self._api = runtime.api
         self._api_coordinator = runtime.api_coordinator
+        self._playback_coordinator = runtime.playback_coordinator
+        self._cancel_playback_expiry = None
         self._attr_unique_id = f"{entry.unique_id}_media_player"
         self._attr_device_info = device_info(entry)
 
@@ -73,9 +78,39 @@ class QuietThingsMediaPlayer(CoordinatorEntity[StockCoordinator], MediaPlayerEnt
         self.async_on_remove(
             self._api_coordinator.async_add_listener(self._handle_api_update)
         )
+        if self._playback_coordinator:
+            self.async_on_remove(
+                self._playback_coordinator.async_add_listener(self._handle_api_update)
+            )
+            self.async_on_remove(self._cancel_expiry)
+            self._schedule_expiry()
 
     @callback
     def _handle_api_update(self) -> None:
+        self._schedule_expiry()
+        self.async_write_ha_state()
+
+    def _cancel_expiry(self):
+        if self._cancel_playback_expiry:
+            self._cancel_playback_expiry()
+            self._cancel_playback_expiry = None
+
+    def _schedule_expiry(self):
+        self._cancel_expiry()
+        sample = (
+            self._playback_coordinator.sample if self._playback_coordinator else None
+        )
+        if sample:
+            delay = (
+                15.1 - (datetime.now(UTC) - sample.observed_at).total_seconds()
+            )
+            self._cancel_playback_expiry = async_call_later(
+                self.hass, max(0.1, delay), self._expire_playback
+            )
+
+    @callback
+    def _expire_playback(self, _now):
+        self._cancel_playback_expiry = None
         self.async_write_ha_state()
 
     @property
@@ -90,11 +125,90 @@ class QuietThingsMediaPlayer(CoordinatorEntity[StockCoordinator], MediaPlayerEnt
 
     @property
     def available(self) -> bool:
-        return not (self.coordinator.lost and not self._api_coordinator.last_update_success)
+        return not (
+            self.coordinator.lost and not self._api_coordinator.last_update_success
+        )
 
     @property
-    def state(self) -> MediaPlayerState:
-        return MediaPlayerState.ON if self.coordinator.is_on else MediaPlayerState.OFF
+    def state(self) -> MediaPlayerState | None:
+        power = (self.coordinator.data or {}).get("power", "unknown")
+        if power in {"standby", "off"}:
+            return MediaPlayerState.OFF
+        if power != "on":
+            return None
+        if (sample := self._playback_sample) and sample.state != "unknown":
+            return MediaPlayerState(sample.state)
+        return MediaPlayerState.ON
+
+    @property
+    def _playback_sample(self):
+        # Hardware off always clears playback, even if an app reported stale media.
+        if not self.coordinator.is_on or not self._playback_coordinator:
+            return None
+        return self._playback_coordinator.sample
+
+    @property
+    def supported_features(self) -> MediaPlayerEntityFeature:
+        result = self._attr_supported_features
+        if sample := self._playback_sample:
+            for command, feature in {
+                "play": MediaPlayerEntityFeature.PLAY,
+                "pause": MediaPlayerEntityFeature.PAUSE,
+                "stop": MediaPlayerEntityFeature.STOP,
+                "seek": MediaPlayerEntityFeature.SEEK,
+            }.items():
+                if command in sample.commands:
+                    result |= feature
+        return result
+
+    @property
+    def app_id(self) -> str | None:
+        return sample.app_id if (sample := self._playback_sample) else None
+
+    @property
+    def media_title(self) -> str | None:
+        return sample.title if (sample := self._playback_sample) else None
+
+    @property
+    def media_content_type(self) -> MediaType | str | None:
+        if not (sample := self._playback_sample):
+            return None
+        return {
+            "Movie": MediaType.MOVIE,
+            "Episode": MediaType.TVSHOW,
+            "Video": MediaType.VIDEO,
+            "Audio": MediaType.MUSIC,
+            "TvChannel": MediaType.CHANNEL,
+        }.get(sample.media_type)
+
+    @property
+    def media_position(self) -> float | None:
+        return sample.position if (sample := self._playback_sample) else None
+
+    @property
+    def media_duration(self) -> float | None:
+        return sample.duration if (sample := self._playback_sample) else None
+
+    @property
+    def media_position_updated_at(self):
+        return sample.position_updated_at if (sample := self._playback_sample) else None
+
+    async def _playback_command(self, action: str, position: float | None = None):
+        if not self._playback_sample or not self._playback_coordinator:
+            raise HomeAssistantError("Playback command unavailable")
+        await self._playback_coordinator.command(action, position)
+
+    async def async_media_play(self) -> None:
+        await self._playback_command("play")
+
+    async def async_media_pause(self) -> None:
+        await self._playback_command("pause")
+
+    async def async_media_stop(self) -> None:
+        await self._playback_command("stop")
+
+    async def async_media_seek(self, position: float) -> None:
+        await self._playback_command("seek", position)
 
     @property
     def volume_level(self) -> float | None:
