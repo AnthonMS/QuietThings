@@ -13,11 +13,11 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from .api import QuietThingsApi
 from .const import (
     CONF_API_PORT,
-    CONF_PLAYBACK_PORT,
     CONF_API_TOKEN,
     CONF_BROADCAST,
     CONF_HOST,
     CONF_MAC,
+    CONF_PLAYBACK_PORT,
     CONF_SCAN_INTERVAL,
     CONF_WS_TOKEN,
     DEFAULT_API_PORT,
@@ -25,8 +25,8 @@ from .const import (
     DEFAULT_SCAN_INTERVAL,
 )
 from .coordinator import ApiCoordinator, StockCoordinator
-from .stock import StockTv
 from .playback import PlaybackApi, PlaybackCoordinator
+from .stock import StockTv
 
 PLATFORMS = [Platform.MEDIA_PLAYER, Platform.SELECT, Platform.SENSOR]
 

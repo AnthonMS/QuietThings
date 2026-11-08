@@ -18,9 +18,12 @@ from custom_components.quietthings.diagnostics import (
 
 from .conftest import API_TOKEN, DEVICE_ID, MAC, WS_TOKEN
 
+
 def get_device(registry, entry):
     if hasattr(registry, "async_get_device_by_identifier"):
-        return registry.async_get_device_by_identifier(("quietthings", DEVICE_ID), entry.entry_id)
+        return registry.async_get_device_by_identifier(
+            ("quietthings", DEVICE_ID), entry.entry_id
+        )
     return registry.async_get_device(identifiers={("quietthings", DEVICE_ID)})
 
 

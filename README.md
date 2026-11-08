@@ -104,10 +104,11 @@ The integration creates one device per TV.
 
 ## Testing
 
-Home Assistant Core 2026.11 cannot be imported on native Windows because it requires
-`fcntl`, so the integration tests run on Linux (WSL). The test suite runs against
-Home Assistant Core 2026.10.4 using `pytest-homeassistant-custom-component`.
-See `requirements_test.txt` for details.
+Home Assistant Core requires Linux APIs, so the integration tests run on Linux
+(including WSL). The CI matrix tests HA 2026.5.4 with its stock samsungtvws 2.7.2
+and HA 2026.10.4 with samsungtvws 3.0.7. Test dependencies also follow each core's
+package constraints, including async-timeout 4.0.3.
+See `requirements_test.txt` and `requirements_test_2026_5.txt` for details.
 
 ```
 python3.14 -m venv .venv   # Linux, Python >= 3.14

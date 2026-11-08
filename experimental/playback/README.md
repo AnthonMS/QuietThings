@@ -1,8 +1,8 @@
 # Optional playback companion (development)
 
-This extension adds actual player observations to QuietThings without changing the original API v1, its port 18765, fields or source files. It requires a .NET 6 launcher. It is experimental and has not yet been installed as a persistent launcher service on a TV.
+This extension adds actual player observations to QuietThings without changing the original API v1, its port 18765, fields or source files. It requires a .NET 6 launcher. It is experimental and has been installed and tested inside one customized Q60C launcher, rather than as a separate system service.
 
-The first provider supports Moonfin and Jellyfin through their local Jellyfin server sessions. A read-only temporary diagnostic has validated foreground detection, exact-device matching and the companion HTTP response on a Q60C, including an SDK-context process with UID 5001. This is not a completed installed-launcher, transport or standby test.
+The first provider supports Moonfin and Jellyfin through their local Jellyfin server sessions. Installed-device checks verified Moonfin playing/paused state, advancing position, episode transitions and play/pause commands through Home Assistant. YouTube foreground identity was also observed, with playback correctly left unknown. Jellyfin client playback, seek, stop and controlled standby/wake remain unverified on hardware.
 
 ## Architecture
 
@@ -36,7 +36,7 @@ The provider requires an exact TV address, the signed-in launcher's user ID, the
 
 A recent replacement session is discovered automatically after app reinstall. Equally recent ambiguous sessions, missing pause state, old/future check-ins and unmatched accounts produce unknown status. The launcher and player must be signed into the same Jellyfin account for this provider.
 
-Pause/play/stop are advertised only when the selected session reports remote-control support. Seek additionally requires CanSeek and a duration. Before sending a command, the provider reselects the current foreground session. A changed account/server is rejected. The response acknowledges server acceptance; it does not invent a new playback state. Actual TV command delivery remains to be tested with the owner present.
+Pause/play/stop are advertised only when the selected session reports remote-control support. Seek additionally requires CanSeek and a duration. Before sending a command, the provider reselects the current foreground session. A changed account/server is rejected. The response acknowledges server acceptance; it does not invent a new playback state. After a command, HA immediately reads an actual observation through the coordinator's serialized refresh instead of its default 10-second request debounce. App/server reporting can still add latency.
 
 Hardware standby/off takes precedence over media state. A stock REST timeout is unknown, rather than proof of off. A cached playing observation cannot imply that the panel is on. HA expires media metadata independently of its configured polling interval.
 
@@ -69,4 +69,12 @@ dotnet run --project kit/tests/LanApiTests.csproj
 
 CI runs both HA targets and the .NET tests. Tests cover real integration entity behavior, account/IP boundaries, app changes during a request, reinstall selection, unknown/expired observations, optional failures, transport routing, diagnostics redaction and authenticated loopback HTTP. The actual samsungtvws implementations also complete a loopback handshake/key exchange on both dependency versions. No test requires a real TV, private service or credential.
 
-Remaining hardware work: installed launcher's background lifetime/UI-thread behavior, actual transport and seek, volume/mute/HDMI regression checks, remote mappings, app switching, standby/wake, full restart and recovery. Do not present the development build as an accepted production upgrade before those checks.
+Installed-device evidence on one Samsung Q60C with Tizen 9 and .NET 6.0.9:
+
+- Physical and existing HA remote navigation worked; all eight custom remote grabs and existing account sign-ins remained intact.
+- The companion remained reachable while Moonfin and YouTube were foreground. Unsupported YouTube playback returned unknown with no media metadata.
+- Moonfin reported playing, paused, advancing position and automatic episode changes through the new HA entity and an existing universal media player.
+- Play and pause commands changed real playback. A rapid pause/resume pair confirmed actual HA state in approximately 0.20 and 0.16 seconds on that LAN, with commands just over one second apart. These are individual observations, not a latency guarantee.
+- Following an unexpected power cut, both APIs recovered, sign-ins and remote grabs persisted, and the existing boot helper recovered. This is recovery evidence, not a controlled standby/wake test.
+
+Remaining hardware work: seek/stop, the separate Jellyfin client, volume/mute/HDMI regression checks, controlled app-switch clearing and standby/wake, reinstall/session replacement, and longer background/memory-pressure testing. Session replacement and stale/app-switch rejection currently have automated coverage. This is a draft implementation for architectural review, not an all-app playback solution or a generally accepted release.

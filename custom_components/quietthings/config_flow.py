@@ -7,7 +7,6 @@ from collections.abc import Mapping
 from typing import Any
 
 import voluptuous as vol
-
 from homeassistant.config_entries import (
     ConfigEntry,
     ConfigFlow,
@@ -20,13 +19,13 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from .api import QuietThingsApi, QuietThingsAuthError, QuietThingsError
 from .const import (
     CONF_API_PORT,
-    CONF_PLAYBACK_PORT,
     CONF_API_TOKEN,
     CONF_BROADCAST,
     CONF_HOST,
     CONF_MAC,
     CONF_MODEL,
     CONF_NAME,
+    CONF_PLAYBACK_PORT,
     CONF_SCAN_INTERVAL,
     CONF_WS_TOKEN,
     DEFAULT_API_PORT,
