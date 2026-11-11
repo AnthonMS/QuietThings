@@ -48,6 +48,7 @@ class FakeTv:
     api_down: bool = False
     valid_token: str = API_TOKEN
     api_version: int = 1
+    display_power: str | None = None
     hdmi_fail: bool = False
     selected_port: int | None = 2
     no_signal_ports: set[int] = field(default_factory=set)
@@ -101,6 +102,15 @@ def install_tv(aioclient_mock, tv: FakeTv) -> None:
 
     def reply(method, url, status=200, body=None):
         return AiohttpClientMockResponse(method, url, status=status, json=body)
+
+    async def display_power(method, url, data):
+        from datetime import UTC, datetime
+        if tv.display_power is None:
+            return reply(method, url, status=404, body={"error":"unsupported"})
+        return reply(method, url, body={"ok":True,"power":tv.display_power,
+            "power_source":"tizen-display","observed_at":datetime.now(UTC).isoformat()})
+
+    aioclient_mock.get(f"{API_URL}/power", side_effect=display_power)
 
     async def stock(method, url, data):
         if tv.stock_down:

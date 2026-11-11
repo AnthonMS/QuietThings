@@ -141,6 +141,14 @@ class QuietThingsMediaPlayer(CoordinatorEntity[StockCoordinator], MediaPlayerEnt
         return MediaPlayerState.ON
 
     @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        data = self.coordinator.data or {}
+        return {
+            "power_source": data.get("power_source", "samsung-rest"),
+            "samsung_power_state": (data.get("device") or {}).get("PowerState"),
+        }
+
+    @property
     def _playback_sample(self):
         # Hardware off always clears playback, even if an app reported stale media.
         if not self.coordinator.is_on or not self._playback_coordinator:
@@ -260,14 +268,14 @@ class QuietThingsMediaPlayer(CoordinatorEntity[StockCoordinator], MediaPlayerEnt
             await self._stock.power_on()
         except StockError as err:
             raise HomeAssistantError(str(err)) from err
-        await self.coordinator.async_request_refresh()
+        await self.coordinator.async_refresh()
 
     async def async_turn_off(self) -> None:
         try:
             await self._stock.power_off()
         except StockError as err:
             raise HomeAssistantError(str(err)) from err
-        await self.coordinator.async_request_refresh()
+        await self.coordinator.async_refresh()
 
     async def _call(self, coro) -> None:
         try:

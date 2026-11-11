@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Any
+from datetime import UTC, datetime
 
 import aiohttp
 
@@ -92,6 +93,20 @@ class QuietThingsApi:
     async def state(self) -> dict[str, Any]:
         """GET /state."""
         return await self._request("GET", "/state")
+
+    async def display_power(self) -> str | None:
+        """Optional fresh native panel observation; legacy hosts return 404."""
+        body = await self._request("GET", "/power")
+        power = body.get("power")
+        if body.get("power_source") != "tizen-display" or not isinstance(power, str) or power not in {"on", "off"}:
+            return None
+        try:
+            observed = datetime.fromisoformat(body["observed_at"])
+            if observed.tzinfo is None or not -5 <= (datetime.now(UTC) - observed).total_seconds() <= 10:
+                return None
+        except (KeyError, TypeError, ValueError):
+            return None
+        return power
 
     async def select_hdmi(self, port: int) -> dict[str, Any]:
         """POST /hdmi/{port}."""

@@ -92,7 +92,7 @@ The integration creates one device per TV.
 
 | Entity                                | Notes                                                        |
 | ------------------------------------- | ------------------------------------------------------------ |
-| `media_player` (uses the device name) | Reports power state from the TV's stock service on port 8001. Supports power on (Wake-on-LAN, with `KEY_POWER` as a fallback), power off, volume level, mute, and volume up/down in steps of 1. Sources range from `HDMI 1` to `HDMI 4`, with labels such as `HDMI 2 (Cable Box)`. `select_source` accepts `HDMI 4` and `HDMI 4 (PC)`; any other value is rejected. |
+| `media_player` (uses the device name) | Reports power state from fresh native display observations when supported, with the TV's stock service on port 8001 as fallback. Supports power on (Wake-on-LAN, with `KEY_POWER` as a fallback), power off, volume level, mute, and volume up/down in steps of 1. Sources range from `HDMI 1` to `HDMI 4`, with labels such as `HDMI 2 (Cable Box)`. `select_source` accepts `HDMI 4` and `HDMI 4 (PC)`; any other value is rejected. |
 | `select` HDMI input                   | Options are exactly `HDMI 1` through `HDMI 4`. Attributes: `labels`, `connected`. |
 | `sensor` Current input                | Reports the selected input name. Attributes: `port`, `id`.   |
 | `sensor` Input signal                 | Reports `active`, `no_signal` (the selected port has no signal), or `unknown`. |
@@ -100,7 +100,7 @@ The integration creates one device per TV.
 ## Behavior and limitations
 
 - The select entity and both sensors are unavailable if the most recent QuietThings API `/state` request failed.
-- The media player remains available for power control. A loss of communication with the stock port is reported as unknown; it does not prove that the TV is off. The media player becomes unavailable only after 3 consecutive failed stock polls while the API is also down.
+- The media player remains available for power control. A loss of communication with the stock port is reported as unknown; it does not prove that the TV is off. The media player becomes unavailable only after 3 consecutive failed stock polls while the API is also down and no valid native display observation is available.
 - The integration checks the API version during setup. A TV reporting a different version is not accepted.
 - Keep the API token private. Do not paste it into chats, logs, or issues. Diagnostic downloads redact it.
 - The API allows approximately 4 requests per second. Requests exceeding this rate receive a 429 response.
@@ -165,3 +165,10 @@ The development branch adds an optional playback companion for actual Moonfin/Je
 The custom Quiet Home development companion can advertise notification capabilities in addition to playback. This working copy adds `quietthings.notify`, `quietthings.dismiss_notification` and `quietthings_notification_action` events. They require the optional playback port and the compatible custom TV build. Stock QuietThings/QuietTizen do not gain an overlay from the HA change alone.
 
 Home Assistant sends title/message, a live camera preview or bounded URL image/GIF and optional named buttons to the TV. Navigation is captured automatically; OK/dismiss is selected first and closing the notice returns input to the app. A new accepted notice replaces the visible one without queuing it. Images are resized in HA, so camera URLs and credentials never reach the TV. Buttons emit explicit, expiring events rather than executing HA services on the TV. A persisted cursor prevents replay after restart. The service requires an explicit QuietThings configuration entry ID. See [notification services](custom_components/quietthings/services.yaml) and the launcher's `docs/NOTIFICATIONS.md` for examples and limits. The optional package [doorbell-tv.yaml](examples/doorbell-tv.yaml) demonstrates doorbell and camera-zone person triggers with a shared TV-on script and explicit lock callback; the integration itself does not install automations.
+
+
+### Optional native display power
+
+A matching Quiet Home build offers authenticated GET `/power` on the existing control port. It reads the native Tizen display state, reports `power` (`on`, `off` or `unknown`), `power_source: tizen-display` and a timezone-qualified `observed_at`. The integration validates source, value and freshness before preferring it over Samsung REST, including power-command guards. Legacy hosts returning 404 and unknown/error observations retain stock fallback. The media player exposes `power_source` and `samsung_power_state` for diagnosis.
+
+This addresses a reproduced Samsung standby report while the panel and YouTube were actually on. Two digital-remote off/on cycles passed on the development TV, including 45-second standby. Native off also clears background media. This is not certification of all sleep durations, firmware or network wake conditions. For a universal media player, configure its state and power command authority to this QuietThings entity; leaving Samsung as its explicit state authority bypasses the correction. The existing token and trusted-LAN security boundaries remain unchanged.

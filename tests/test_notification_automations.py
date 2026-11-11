@@ -156,3 +156,17 @@ async def test_person_notice_callback_uses_existing_guarded_unlock(hass,example)
     })
     await hass.async_block_till_done()
     assert len(unlocks)==1  # Only the isolated fixture's mocked service is called.
+
+
+async def test_confirmed_native_off_wins_over_stale_samsung_on(hass,example):
+    notices,unlocks,_=example
+    hass.states.async_set("media_player.quietthings_living_room", "off")
+    hass.states.async_set("media_player.samsung_livingroom", "on")
+    await person_detected(hass)
+    hass.bus.async_fire("deconz_event", {"id":"door_bell","event":1004})
+    hass.bus.async_fire("quietthings_notification_action", {
+        "entry_id":"QUIETTHINGS_ENTRY_ID", "action":"UNLOCK_FRONT_DOOR",
+        "notification_id":"person-tv-test", "event_id":"test-stale-stock",
+    })
+    await hass.async_block_till_done()
+    assert notices==unlocks==[]

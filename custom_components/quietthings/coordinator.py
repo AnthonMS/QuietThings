@@ -43,11 +43,15 @@ class StockCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             device = await self.stock.device_info()
         except StockError:
             self.consecutive_failures += 1
+            if (native := await self.stock.native_power_state()) is not None:
+                return {"power": native, "device": None, "power_source": "tizen-display"}
             return {"power": "unreachable", "device": None}
         self.consecutive_failures = 0
+        native = await self.stock.native_power_state()
         return {
-            "power": str(device.get("PowerState", "unknown")).lower(),
+            "power": native if native is not None else str(device.get("PowerState", "unknown")).lower(),
             "device": device,
+            "power_source": "tizen-display" if native is not None else "samsung-rest",
         }
 
     @property
@@ -58,7 +62,7 @@ class StockCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     @property
     def lost(self) -> bool:
         """True when 8001 has failed enough polls in a row."""
-        return self.consecutive_failures >= STOCK_FAILURES_BEFORE_UNAVAILABLE
+        return self.consecutive_failures >= STOCK_FAILURES_BEFORE_UNAVAILABLE and (self.data or {}).get("power_source") != "tizen-display"
 
 
 class ApiCoordinator(DataUpdateCoordinator[dict[str, Any]]):

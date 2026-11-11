@@ -57,6 +57,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: QuietThingsConfigEntry) 
             entry, data={**entry.data, CONF_WS_TOKEN: token}
         )
 
+    api = QuietThingsApi(
+        session,
+        data[CONF_HOST],
+        data.get(CONF_API_PORT, DEFAULT_API_PORT),
+        data[CONF_API_TOKEN],
+    )
     stock = StockTv(
         session,
         data[CONF_HOST],
@@ -64,12 +70,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: QuietThingsConfigEntry) 
         data.get(CONF_BROADCAST, DEFAULT_BROADCAST),
         data.get(CONF_WS_TOKEN),
         store_token,
-    )
-    api = QuietThingsApi(
-        session,
-        data[CONF_HOST],
-        data.get(CONF_API_PORT, DEFAULT_API_PORT),
-        data[CONF_API_TOKEN],
+        display_power=api.display_power,
     )
     interval = entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
     stock_coordinator = StockCoordinator(hass, entry, stock, interval)

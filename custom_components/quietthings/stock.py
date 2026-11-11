@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 import logging
 import re
 from typing import Any
@@ -14,6 +14,7 @@ from samsungtvws.async_remote import SamsungTVWSAsyncRemote
 from samsungtvws.remote import SendRemoteKey
 
 from .const import STOCK_REST_PORT, STOCK_WS_PORT, WOL_PORT, WS_CLIENT_NAME
+from .api import QuietThingsError
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -68,6 +69,7 @@ class StockTv:
         broadcast: str,
         ws_token: str | None = None,
         token_callback: Callable[[str], None] | None = None,
+        display_power: Callable[[], Awaitable[str | None]] | None = None,
     ) -> None:
         self._session = session
         self.host = host
@@ -75,6 +77,17 @@ class StockTv:
         self.broadcast = broadcast
         self.ws_token = ws_token
         self._token_callback = token_callback
+        self._display_power = display_power
+
+    async def native_power_state(self) -> str | None:
+        """Use the panel's actual state when the optional host API supports it."""
+        if self._display_power is None:
+            return None
+        try:
+            state = await self._display_power()
+        except QuietThingsError:
+            return None
+        return {"on": "on", "off": "standby"}.get(state)
 
     async def device_info(self) -> dict[str, Any]:
         """GET /api/v2/ and return the `device` object."""
@@ -94,6 +107,8 @@ class StockTv:
 
     async def power_state(self) -> str:
         """Lower-case PowerState, `unreachable` when 8001 does not answer."""
+        if (native := await self.native_power_state()) is not None:
+            return native
         try:
             device = await self.device_info()
         except StockError:

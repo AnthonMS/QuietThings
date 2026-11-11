@@ -19,9 +19,10 @@ script:
     sequence:
       - condition: template
         value_template: >-
-          {{ states('media_player.quietthings_living_room') in
-             ['on', 'playing', 'paused', 'idle', 'buffering']
-             or is_state('media_player.samsung_livingroom', 'on') }}
+          {% set tv = states('media_player.quietthings_living_room') %}
+          {{ tv in ['on', 'playing', 'paused', 'idle', 'buffering']
+             or (tv in ['unknown', 'unavailable']
+                 and is_state('media_player.samsung_livingroom', 'on')) }}
       - variables:
           tv_person_detected: "{{ (notification_kind | default('doorbell')) == 'person' }}"
           tv_notification_id: "{{ 'person-tv-' if tv_person_detected else 'doorbell-tv-' }}{{ now().strftime('%Y%m%d%H%M%S%f') }}"
@@ -107,9 +108,10 @@ automation:
         state: locked
       - condition: template
         value_template: >-
-          {{ states('media_player.quietthings_living_room') in
-             ['on', 'playing', 'paused', 'idle', 'buffering']
-             or is_state('media_player.samsung_livingroom', 'on') }}
+          {% set tv = states('media_player.quietthings_living_room') %}
+          {{ tv in ['on', 'playing', 'paused', 'idle', 'buffering']
+             or (tv in ['unknown', 'unavailable']
+                 and is_state('media_player.samsung_livingroom', 'on')) }}
     actions:
       - action: lock.unlock
         target:
