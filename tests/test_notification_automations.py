@@ -93,3 +93,66 @@ async def test_callback_rechecks_lock_state(hass,example):
     hass.bus.async_fire("quietthings_notification_action",{"entry_id":"QUIETTHINGS_ENTRY_ID","action":"UNLOCK_FRONT_DOOR","notification_id":"doorbell-tv-test"})
     await hass.async_block_till_done()
     assert unlocks==[]
+
+
+async def person_detected(hass):
+    hass.states.async_set("binary_sensor.detection_zone_person_occupancy", "off")
+    await hass.async_block_till_done()
+    hass.states.async_set("binary_sensor.detection_zone_person_occupancy", "on")
+    await hass.async_block_till_done()
+
+
+async def test_person_detection_uses_camera_without_light_or_daylight_gate(hass,example):
+    notices,unlocks,_=example
+    hass.states.async_set("sun.sun", "above_horizon", {"elevation":45})
+    hass.states.async_set("light.front_door_spots", "on")
+    hass.states.async_set("input_boolean.motion_front_door_enabled", "off")
+    await person_detected(hass)
+    assert len(notices)==1
+    assert notices[0]["title"]=="Person at the front door"
+    assert notices[0]["message"]=="A person was detected by the front door camera."
+    assert notices[0]["id"].startswith("person-tv-")
+    assert notices[0]["camera_entity"]=="camera.front_door"
+    assert notices[0]["actions"]==[{"action":"UNLOCK_FRONT_DOOR","title":"Unlock Door"}]
+    assert unlocks==[]
+
+
+async def test_person_detection_tv_off_does_not_send_or_wake(hass,example):
+    notices,unlocks,_=example
+    hass.states.async_set("media_player.quietthings_living_room", "off")
+    hass.states.async_set("media_player.samsung_livingroom", "off")
+    await person_detected(hass)
+    assert notices==unlocks==[]
+
+
+async def test_person_detection_does_not_repeat_until_zone_clears(hass,example):
+    notices,unlocks,_=example
+    await person_detected(hass)
+    hass.states.async_set("binary_sensor.detection_zone_person_occupancy", "on", {"count":2})
+    await hass.async_block_till_done()
+    assert len(notices)==1
+    await person_detected(hass)
+    assert len(notices)==2 and notices[0]["id"]!=notices[1]["id"]
+    assert unlocks==[]
+
+
+async def test_person_camera_failure_keeps_person_text(hass,example):
+    notices,unlocks,fail=example
+    fail["enabled"]=True
+    await person_detected(hass)
+    assert len(notices)==2
+    assert "camera_entity" not in notices[1]
+    assert notices[1]["title"]=="Person at the front door"
+    assert "Camera preview is unavailable" in notices[1]["message"]
+    assert notices[0]["id"]==notices[1]["id"]
+    assert unlocks==[]
+
+
+async def test_person_notice_callback_uses_existing_guarded_unlock(hass,example):
+    _,unlocks,_=example
+    hass.bus.async_fire("quietthings_notification_action", {
+        "entry_id":"QUIETTHINGS_ENTRY_ID", "action":"UNLOCK_FRONT_DOOR",
+        "notification_id":"person-tv-test", "event_id":"test-person-event",
+    })
+    await hass.async_block_till_done()
+    assert len(unlocks)==1  # Only the isolated fixture's mocked service is called.

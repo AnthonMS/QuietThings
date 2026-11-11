@@ -6,6 +6,16 @@ script:
     alias: "Doorbell: show living room TV notification"
     description: "Live camera while the TV is on, with Unlock Door only when locked."
     mode: restart
+    fields:
+      notification_kind:
+        name: Notification kind
+        description: Doorbell by default; person is used by the camera detection automation.
+        default: doorbell
+        selector:
+          select:
+            options:
+              - doorbell
+              - person
     sequence:
       - condition: template
         value_template: >-
@@ -13,7 +23,10 @@ script:
              ['on', 'playing', 'paused', 'idle', 'buffering']
              or is_state('media_player.samsung_livingroom', 'on') }}
       - variables:
-          tv_notification_id: "doorbell-tv-{{ now().strftime('%Y%m%d%H%M%S%f') }}"
+          tv_person_detected: "{{ (notification_kind | default('doorbell')) == 'person' }}"
+          tv_notification_id: "{{ 'person-tv-' if tv_person_detected else 'doorbell-tv-' }}{{ now().strftime('%Y%m%d%H%M%S%f') }}"
+          tv_notification_title: "{{ 'Person at the front door' if tv_person_detected else 'Someone at the front door' }}"
+          tv_notification_message: "{{ 'A person was detected by the front door camera.' if tv_person_detected else 'The doorbell was pressed.' }}"
           tv_notification_actions: >-
             {{ [{'action': 'UNLOCK_FRONT_DOOR', 'title': 'Unlock Door'}]
                if is_state('lock.front_door', 'locked') else [] }}
@@ -23,8 +36,8 @@ script:
         data:
           entry_id: QUIETTHINGS_ENTRY_ID
           id: "{{ tv_notification_id }}"
-          title: "Someone at the front door"
-          message: "The doorbell was pressed."
+          title: "{{ tv_notification_title }}"
+          message: "{{ tv_notification_message }}"
           camera_entity: camera.front_door
           duration_seconds: 30
           actions: "{{ tv_notification_actions }}"
@@ -39,8 +52,8 @@ script:
             data:
               entry_id: QUIETTHINGS_ENTRY_ID
               id: "{{ tv_notification_id }}"
-              title: "Someone at the front door"
-              message: "The doorbell was pressed. Camera preview is unavailable."
+              title: "{{ tv_notification_title }}"
+              message: "{{ tv_notification_message }} Camera preview is unavailable."
               duration_seconds: 30
               actions: "{{ tv_notification_actions }}"
 
@@ -60,9 +73,23 @@ automation:
     actions:
       - action: script.door_bell_notify_tv
 
+  - id: quiet_home_front_door_person_tv_notification
+    alias: "Quiet Home: front door person camera notification"
+    description: "Notify an awake TV on a new person detection in the front door zone, day or night."
+    mode: restart
+    triggers:
+      - trigger: state
+        entity_id: binary_sensor.detection_zone_person_occupancy
+        from: "off"
+        to: "on"
+    actions:
+      - action: script.door_bell_notify_tv
+        data:
+          notification_kind: person
+
   - id: quiet_home_doorbell_tv_unlock_callback
     alias: "Quiet Home: Unlock Door notification action"
-    description: "Only a matching live TV doorbell notification can request this action."
+    description: "Only a matching live TV doorbell or person notification can request this action."
     mode: single
     triggers:
       - trigger: event
@@ -73,7 +100,8 @@ automation:
     conditions:
       - condition: template
         value_template: >-
-          {{ trigger.event.data.get('notification_id', '').startswith('doorbell-tv-') }}
+          {{ trigger.event.data.get('notification_id', '').startswith('doorbell-tv-')
+             or trigger.event.data.get('notification_id', '').startswith('person-tv-') }}
       - condition: state
         entity_id: lock.front_door
         state: locked
