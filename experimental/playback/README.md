@@ -2,7 +2,9 @@
 
 This extension adds actual player observations to QuietThings without changing the original API v1, its port 18765, fields or source files. It requires a .NET 6 launcher. It is experimental and has been installed and tested inside one customized Q60C launcher, rather than as a separate system service.
 
-The first provider supports Moonfin and Jellyfin through their local Jellyfin server sessions. Installed-device checks verified Moonfin playing/paused state, advancing position, episode transitions and play/pause commands through Home Assistant. YouTube foreground identity was also observed, with playback correctly left unknown. Jellyfin client playback, seek, stop and controlled standby/wake remain unverified on hardware.
+The Jellyfin-session provider supports Moonfin and the standalone Jellyfin client through their local server. Both clients passed actual HA pause, resume, advancing position, finite seek and stop checks. Cobalt observation supports ordinary YouTube and TizenTube. Protected app inspectors support Twitch and KickTV live playback. See the app-specific evidence and remaining lifecycle work below.
+
+See [six-app development status](MULTI-APP.md) for the current hardware evidence and missing providers. The [web media probe](web/README.md) supplies the installed experimental web providers.
 
 ## Architecture
 
@@ -16,9 +18,9 @@ flowchart LR
     Agent --> Gate[Ownership and freshness checks]
 ```
 
-Collection is demand-driven by authenticated requests. There is no periodic background remote-control loop when HA is not using the companion. Each observation checks the current foreground application, selects its data, and checks foreground ownership again after the network read. A delayed response from the previous app cannot restore its metadata.
+Provider reads are driven by authenticated requests. The installed Cobalt page observer additionally emits bounded actual-player snapshots about every 750 ms while its document is active, including when HA is idle. It performs a player command only when an authenticated current-lease request arrives. Twitch and KickTV inspector reads remain demand-driven. Each observation checks the current foreground application, selects its data, and checks foreground ownership again after the network read. A delayed response from the previous app cannot restore its metadata.
 
-IPlaybackProvider is the extension point for future native or web-app observations. Additional providers precede the default Jellyfin provider. Names must be unique. Providers cannot attribute media to a different foreground app; expired observations are discarded. No adapter for YouTube, TizenTube, Twitch or KickTV is implemented or claimed in this version.
+IPlaybackProvider is the extension point for native or web-app observations. Additional providers precede the default Jellyfin provider. Names must be unique. Providers cannot attribute media to a different foreground app; expired observations are discarded. The installed experimental providers include twitch-web-player, kicktv-web-player and cobalt-player. They observe actual app-owned players and expose only the capabilities of the current sample. Their protected root bridge is an additional component for an inspected rooted TV.
 
 ## Setup
 
@@ -36,7 +38,7 @@ The provider requires an exact TV address, the signed-in launcher's user ID, the
 
 A recent replacement session is discovered automatically after app reinstall. Equally recent ambiguous sessions, missing pause state, old/future check-ins and unmatched accounts produce unknown status. The launcher and player must be signed into the same Jellyfin account for this provider.
 
-Pause/play/stop are advertised only when the selected session reports remote-control support. Seek additionally requires CanSeek and a duration. Before sending a command, the provider reselects the current foreground session. A changed account/server is rejected. The response acknowledges server acceptance; it does not invent a new playback state. After a command, HA immediately reads an actual observation through the coordinator's serialized refresh instead of its default 10-second request debounce. App/server reporting can still add latency.
+Pause/play/stop are advertised only when the selected session reports remote-control support. Seek additionally requires CanSeek and a duration. Before sending a command, the provider reselects the current foreground session. A changed account/server is rejected. After delivery, the provider waits up to five seconds for the same client session to report the requested actual state or seek position. A replacement session or missing acknowledgement rejects the command; caller cancellation remains cancellation. Idle clients use their recent LastActivityDate because they may have no playback check-in. No state is invented. After a command, HA immediately reads an actual observation through the coordinator's serialized refresh instead of its default 10-second request debounce. App/server reporting can still add latency.
 
 Hardware standby/off takes precedence over media state. A stock REST timeout is unknown, rather than proof of off. A cached playing observation cannot imply that the panel is on. HA expires media metadata independently of its configured polling interval.
 
@@ -48,7 +50,7 @@ Every request requires Authorization: Bearer TOKEN. Headers are capped at 8192 b
 - GET /v1/playback: ok, extension_version and playback object.
 - POST /v1/command: action play, pause, stop or seek; seek also takes position_seconds. Unknown commands are rejected. No shell/file/package endpoint exists.
 
-Playback fields: app_id, state, adapter, title, media_type, position_seconds, duration_seconds, observed_at, position_updated_at and commands. State is unknown, idle, playing, paused or buffering. Timestamps include a UTC offset. Commands are capabilities of that observation, not global promises. Unknown/idle metadata must be cleared by clients.
+Playback fields: app_id, optional app_name, state, adapter, title, media_type, position_seconds, duration_seconds, observed_at, position_updated_at and commands. State is unknown, idle, playing, paused or buffering. Timestamps include a UTC offset. Commands are capabilities of that observation, not global promises. Unknown/idle metadata must be cleared by clients.
 
 Errors use 401 for auth, 400 for invalid commands/requests, 404/405 for route/method, 409 for unavailable/rejected controls, 413/431 for size limits, 429 for rate limits and 503 for failed observation setup. Network/source failure can also produce a successful unknown observation. Error messages omit exception strings, credentials and viewing data.
 
@@ -72,9 +74,27 @@ CI runs both HA targets and the .NET tests. Tests cover real integration entity 
 Installed-device evidence on one Samsung Q60C with Tizen 9 and .NET 6.0.9:
 
 - Physical and existing HA remote navigation worked; all eight custom remote grabs and existing account sign-ins remained intact.
-- The companion remained reachable while Moonfin and YouTube were foreground. Unsupported YouTube playback returned unknown with no media metadata.
+- The companion remained reachable across the six tested apps. YouTube and TizenTube report actual HTML5 playback through the Cobalt observer; confirmed readable empty menus now report idle. Failed, ambiguous and actively initializing players remain unknown.
 - Moonfin reported playing, paused, advancing position and automatic episode changes through the new HA entity and an existing universal media player.
 - Play and pause commands changed real playback. A rapid pause/resume pair confirmed actual HA state in approximately 0.20 and 0.16 seconds on that LAN, with commands just over one second apart. These are individual observations, not a latency guarantee.
 - Following an unexpected power cut, both APIs recovered, sign-ins and remote grabs persisted, and the existing boot helper recovered. This is recovery evidence, not a controlled standby/wake test.
 
-Remaining hardware work: seek/stop, the separate Jellyfin client, volume/mute/HDMI regression checks, controlled app-switch clearing and standby/wake, reinstall/session replacement, and longer background/memory-pressure testing. Session replacement and stale/app-switch rejection currently have automated coverage. This is a draft implementation for architectural review, not an all-app playback solution or a generally accepted release.
+Moonfin and standalone Jellyfin passed pause/resume, finite seek and stop on the development TV. Cobalt mode switching rejects the previous document lease, and app exit clears metadata. Controlled final boot/standby and live-app regression results are tracked in MULTI-APP.md. Volume and mute changes were read back through HA and restored to their original values. HDMI switching, a real app reinstall, an actual IPv6 LAN connection attempt and longer memory-pressure testing are not certified by these tests. This experimental implementation covers the named apps on one inspected TV; it does not establish universal Samsung app compatibility.
+
+A confirmed idle app keeps its app name while clearing media metadata and commands. Cobalt names distinguish YouTube and TizenTube using the attested proxy mode. Readable complete menus with no loaded media, including paused empty player placeholders, report idle. Errors, ambiguous players and active initialization remain unknown. A dashboard can display the app name with Nothing Playing for idle, while keeping playback failures separate.
+
+## Current limitations and release hold
+
+The later installed title/menu update reads Twitch titles from channel-matched hidden player headings and KickTV broadcast titles from a cached lookup of the app's normal channel metadata API. Real titles reached HA on two channels in each app, including pause/resume and menu transitions. App-specific confirmed menus now pass idle through WebPlaybackProvider, clearing title/timing/controls. Twitch browse previews are not treated as the primary player. Both app tiles and launcher remote remaps use the managed inspector path; unrelated launch routes still do not automatically attach an inspector.
+
+Kick enrichment is a bounded HTTPS lookup from the app, not entirely passive/local-only metadata extraction. It needs no additional HA cloud account/API key. It refreshes after 30 seconds, allows one in-flight request, times out after five seconds and expires unrefreshed titles after 90 seconds. Channel/source-generation/loading/ready checks reject stale responses and old titles. Initial title arrival can wait for the next HA poll. Twitch markup mismatches and Kick API failures omit titles rather than guessing.
+
+Use the dedicated QuietThings media player's app_name/app_id attributes, entity state and media_title for app/status/title display. Idle means a confirmed menu/no primary playback; on alone means powered with unknown playback. The universal player may fall back to Samsung while idle and omit app attributes, so the custom dashboard reads the dedicated playback child for these labels. No separate per-app entity is required.
+
+Current title-build checks: 131 shared playback checks, 21 bridge checks, 22 Python HTTP/lifecycle tests, title/context JavaScript and Cobalt client/proxy regressions, with zero-warning builds. No HA Python/UI change or restart was required. A new full TV reboot was not performed for this title build; retain the earlier lifecycle limits rather than implying fresh reboot certification.
+
+The owner's custom dashboard uses timestamp-interpolated, read-only progress bars. Integration/API finite seek support does not mean those bars are draggable. Supported controls and metadata depend on the current provider sample.
+
+A later startup repair enabled Samsung's separate Start with Smart Hub Home policy after a selector-only fix reverted at boot. Automatic Home foreground passed a full restart and input-to-Home wake readbacks. Direct Samsung HA wake remained intermittent; a QuietThings request was also skipped once while its entity was unavailable. Final recovery used repeated PC Wake-on-LAN. Guaranteed deep-standby HA wake is not established, and the universal player's Samsung power-on route was not changed.
+
+Upstream PR1 remains closed. The owner requires daily-use testing before further PR work. This is a customized TV runtime plus a modified integration, not a drop-in HA-only playback upgrade or a released universal installer.

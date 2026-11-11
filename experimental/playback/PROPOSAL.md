@@ -1,15 +1,23 @@
-# Proposed upstream contribution
+# Potential upstream contributions
 
-QuietThings currently provides power, volume and HDMI control but does not expose the foreground player's actual playback state. A local optional companion can add that data while retaining the existing v1 contract and launcher customizations.
+Current assessment: 10 November 2026. This working tree contains installed six-app development support on one customized Q60C. Upstream PR1 is closed, and the owner wants several days of daily-use testing before any further publication. This document does not authorize commits, pushes, reopening or contacting maintainers.
 
-This development branch contains three separable contributions:
+## Three separate scopes
 
-1. Compatibility with HA 2026.5.4 and its samsungtvws 2.7.2 requirement, alongside the current HA 2026.10.4/samsungtvws 3.0.7 test target. Test fixtures accommodate both core APIs, and a CI matrix exercises both.
-2. Honest power uncertainty: inability to read Samsung REST is unknown, not an inferred off state. Explicit standby/off and the existing availability threshold remain authoritative.
-3. An opt-in .NET 6 playback companion with provider boundaries, a foreground-gated Jellyfin/Moonfin provider, authenticated status/control endpoints, and HA playback properties/capabilities. The default remains disabled.
+1. General HA/dependency compatibility and reliability fixes. Tests cover HA 2026.5.4 with its stock samsungtvws 2.7.2 and HA 2026.10.4 with 3.0.7. Stock-service timeouts remain unknown rather than being treated as proof of power off.
+2. Optional HA companion-protocol support. A compatible TV can provide current state, metadata and capabilities through an explicitly enabled companion. The original API v1 remains unchanged and companion port zero disables extra polling. Provider failure clears media without fabricating state.
+3. TV runtime and app-specific instrumentation. Jellyfin/Moonfin session selection runs in the launcher. Twitch/KickTV need a protected root inspector bridge and managed launches. YouTube/TizenTube need app-local Cobalt observation/proxy support, launcher handoff and optional boot-service provisioning. This is a materially larger setup and maintenance burden than an HA-only patch.
 
-The separate companion port is a development choice that avoids modifying the kit's frozen v1 server source. Before proposing a merge, discuss whether upstream prefers this shape or a negotiated additive extension on the original listener. Do not silently change api_version 1 or the meaning of paused.
+## Recommended contribution boundary
 
-The companion is now installed inside one customized .NET 6 launcher on a Q60C. Moonfin state, position, episode transitions, actual play/pause control and recovery after a power cut passed live checks. Both APIs remained reachable during Moonfin and YouTube foreground samples. Existing navigation, remote grabs and sign-ins were retained. A rapid-command regression test and an installed-device check cover HA's refresh debounce delaying resume feedback.
+Consider independent general fixes and an opt-in HA client/protocol proposal separately from the specialized TV runtime. The full six-app deployment should not be presented as a routine integration update or require ordinary users to adopt this owner's entire launcher. Remote remaps, dock layout and privacy masks are not intrinsic protocol requirements.
 
-This remains a draft for architectural review. Seek/stop, the separate Jellyfin client, controlled standby/wake, reinstall behavior and longer memory-pressure testing are not hardware-certified. Other apps expose foreground identity only. The Jellyfin provider uses the existing local server and signed-in account; it is not a generic native Tizen media controller. See README.md for the exact validation boundary. The compatibility and power-uncertainty changes can be split out if preferred.
+Discuss architectural preference only after owner authorization: the separate listener is a development choice that avoids changing the original kit's API v1 source. Upstream may prefer a different capability-negotiation arrangement. Do not silently change api_version 1, claim unmodified launchers supply playback or promise maintainer acceptance.
+
+## Actual implementation status
+
+All six named apps passed the controls listed in [MULTI-APP.md](MULTI-APP.md), including Moonfin/Jellyfin seek and stop and YouTube/TizenTube finite-video seek. Twitch/KickTV provide live state, broadcast titles, play/pause and confirmed menu idle. Twitch uses channel-matched page headings; KickTV uses a bounded lookup of its normal channel metadata API. Both dock tiles and launcher remote remaps use managed launch; other routes are not automatically reattached. Title-source changes, lookup delays and app/API failures remain compatibility limits.
+
+Confirmed readable Cobalt menus report idle and retain the correct YouTube/TizenTube name. Actual app updates/reinstalls, long DVR pauses, extended memory pressure and broader TV/firmware compatibility remain outside completed hardware acceptance. The later Home startup-policy repair and intermittent HA deep-standby wake must be described separately from earlier successful lifecycle checks.
+
+The owner currently has a custom TV stack, a modified QuietThings HA integration and a personal dashboard. None should be described as merged upstream or a generally released six-app installer. See [README.md](README.md) for protocol, exact constraints and validation boundaries.

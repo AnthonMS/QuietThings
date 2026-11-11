@@ -1,0 +1,88 @@
+# Copy as a Home Assistant package and replace QUIETTHINGS_ENTRY_ID.
+# This file is also the source of the owner's installed example.
+# The callback is intentionally explicit: the TV emits a named event, HA acts.
+script:
+  door_bell_notify_tv:
+    alias: "Doorbell: show living room TV notification"
+    description: "Live camera while the TV is on, with Unlock Door only when locked."
+    mode: restart
+    sequence:
+      - condition: template
+        value_template: >-
+          {{ states('media_player.quietthings_living_room') in
+             ['on', 'playing', 'paused', 'idle', 'buffering']
+             or is_state('media_player.samsung_livingroom', 'on') }}
+      - variables:
+          tv_notification_id: "doorbell-tv-{{ now().strftime('%Y%m%d%H%M%S%f') }}"
+          tv_notification_actions: >-
+            {{ [{'action': 'UNLOCK_FRONT_DOOR', 'title': 'Unlock Door'}]
+               if is_state('lock.front_door', 'locked') else [] }}
+      - action: quietthings.notify
+        continue_on_error: true
+        response_variable: tv_notification_response
+        data:
+          entry_id: QUIETTHINGS_ENTRY_ID
+          id: "{{ tv_notification_id }}"
+          title: "Someone at the front door"
+          message: "The doorbell was pressed."
+          camera_entity: camera.front_door
+          duration_seconds: 30
+          actions: "{{ tv_notification_actions }}"
+      # A missing camera should not hide the doorbell notice altogether.
+      - if:
+          - condition: template
+            value_template: >-
+              {{ tv_notification_response is not defined or
+                 not tv_notification_response.get('displayed', false) }}
+        then:
+          - action: quietthings.notify
+            data:
+              entry_id: QUIETTHINGS_ENTRY_ID
+              id: "{{ tv_notification_id }}"
+              title: "Someone at the front door"
+              message: "The doorbell was pressed. Camera preview is unavailable."
+              duration_seconds: 30
+              actions: "{{ tv_notification_actions }}"
+
+automation:
+  - id: quiet_home_doorbell_tv_notification
+    alias: "Quiet Home: doorbell camera notification"
+    description: "Physical doorbell single, double and hold presses notify the TV if on."
+    mode: restart
+    triggers:
+      - trigger: event
+        event_type: deconz_event
+        event_data:
+          id: door_bell
+    conditions:
+      - condition: template
+        value_template: "{{ trigger.event.data.get('event') in [1004, 1006, 1001] }}"
+    actions:
+      - action: script.door_bell_notify_tv
+
+  - id: quiet_home_doorbell_tv_unlock_callback
+    alias: "Quiet Home: Unlock Door notification action"
+    description: "Only a matching live TV doorbell notification can request this action."
+    mode: single
+    triggers:
+      - trigger: event
+        event_type: quietthings_notification_action
+        event_data:
+          entry_id: QUIETTHINGS_ENTRY_ID
+          action: UNLOCK_FRONT_DOOR
+    conditions:
+      - condition: template
+        value_template: >-
+          {{ trigger.event.data.get('notification_id', '').startswith('doorbell-tv-') }}
+      - condition: state
+        entity_id: lock.front_door
+        state: locked
+      - condition: template
+        value_template: >-
+          {{ states('media_player.quietthings_living_room') in
+             ['on', 'playing', 'paused', 'idle', 'buffering']
+             or is_state('media_player.samsung_livingroom', 'on') }}
+    actions:
+      - action: lock.unlock
+        target:
+          entity_id: lock.front_door

@@ -8,3 +8,5 @@ samsungtvws[async,encrypted]==3.0.7
 
 # Needed by samsungtvws 2.7.2 on the older supported HA target.
 async-timeout==4.0.3
+# Camera module imported by notification snapshot tests.
+PyTurboJPEG==1.8.3

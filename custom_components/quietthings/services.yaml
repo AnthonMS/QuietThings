@@ -1,0 +1,76 @@
+notify:
+  name: Show TV notification
+  description: Show a silent Quiet Home overlay that temporarily captures navigation. Buttons and timeout return input to the current app.
+  fields:
+    entry_id:
+      name: TV integration entry
+      required: true
+      selector:
+        config_entry:
+          integration: quietthings
+    id:
+      name: Notification ID
+      description: Optional unique ID. Use a new ID each time an actionable notification is sent.
+      selector:
+        text:
+    title:
+      selector:
+        text:
+    message:
+      required: true
+      selector:
+        text:
+          multiline: true
+    duration_seconds:
+      default: 15
+      selector:
+        number:
+          min: 5
+          max: 120
+          unit_of_measurement: s
+    camera_entity:
+      name: Live camera
+      description: Live preview refreshed by Home Assistant while the notice is visible. Camera credentials remain in Home Assistant.
+      selector:
+        entity:
+          domain: camera
+    camera_mode:
+      name: Camera display
+      default: live
+      selector:
+        select:
+          options:
+            - live
+            - snapshot
+    camera_refresh_seconds:
+      name: Camera refresh interval
+      default: 1
+      selector:
+        number:
+          min: 0.5
+          max: 10
+          step: 0.5
+          unit_of_measurement: s
+    image_url:
+      name: Image or GIF URL
+      description: HTTP(S) image link or /local/path from HA www. Use instead of a camera entity. HA fetches and prepares it.
+      selector:
+        text:
+    actions:
+      description: Up to three action and title objects. Buttons emit quietthings_notification_action events.
+      default: []
+      selector:
+        object:
+dismiss_notification:
+  name: Dismiss TV notification
+  description: Dismiss the matching active notification and cancel its pending actions.
+  fields:
+    entry_id:
+      required: true
+      selector:
+        config_entry:
+          integration: quietthings
+    id:
+      required: true
+      selector:
+        text:

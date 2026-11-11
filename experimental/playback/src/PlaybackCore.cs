@@ -12,6 +12,7 @@ namespace QuietThings.Playback;
 public sealed class PlaybackSnapshot
 {
     public string AppId { get; set; }
+    public string AppName { get; set; }
     public string State { get; set; } = "unknown";
     public string Adapter { get; set; }
     public string Title { get; set; }

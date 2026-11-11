@@ -55,7 +55,9 @@ public sealed class JellyfinPlaybackAdapter
             if (s.ValueKind != JsonValueKind.Object) continue;
             bool hasMedia = s.TryGetProperty("NowPlayingItem", out var media) && media.ValueKind == JsonValueKind.Object;
             s.TryGetProperty("PlayState", out var play);
-            if (!DateTimeOffset.TryParse(Text(s, "LastPlaybackCheckIn"), System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AssumeUniversal, out var time)) continue;
+            // Idle clients have no current playback check-in. Their actual
+            // connection activity can confirm that the same client stopped.
+            if (!DateTimeOffset.TryParse(Text(s, hasMedia ? "LastPlaybackCheckIn" : "LastActivityDate"), System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AssumeUniversal, out var time)) continue;
             yield return new PlaybackSession { Id = Text(s, "Id"), UserId = Text(s, "UserId"), Client = Text(s, "Client"), RemoteEndpoint = Text(s, "RemoteEndPoint"), LastCheckIn = time, HasMedia = hasMedia, IsPaused = Flag(play, "IsPaused"), Title = hasMedia ? Text(media, "Name") : null, MediaType = hasMedia ? Text(media, "Type") : null, PositionTicks = Number(play, "PositionTicks"), DurationTicks = hasMedia ? Number(media, "RunTimeTicks") : null, CanControl = Flag(s, "SupportsRemoteControl") == true, CanSeek = Flag(play, "CanSeek") == true };
         }
     }

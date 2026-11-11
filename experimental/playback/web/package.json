@@ -1,0 +1,9 @@
+{
+  "name": "quietthings-cobalt-observer",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "scripts": { "bundle": "node build-cobalt.cjs" },
+  "dependencies": { "node-forge": "1.4.3" },
+  "devDependencies": { "esbuild": "0.28.2" }
+}

@@ -14,6 +14,8 @@ The project has two parts:
 
 ## What it does
 
+Development-branch note, 10 November 2026: this working tree also contains a modified HA playback client and an optional TV companion. Six-app playback was tested on one customized Q60C. It requires the additional components documented in [experimental/playback](experimental/playback/README.md); Twitch/KickTV and Cobalt observation need more TV setup than the original API kit. The list below describes the original base integration. The playback stack is not merged upstream, and the owner has paused PR publication for daily-use testing.
+
 - Turn the TV on and off
 - Adjust volume and mute audio
 - Switch HDMI inputs
@@ -47,6 +49,8 @@ QuietThings was developed using a Samsung QN90B, while QuietTizen itself was
 built for the U8000F. Other models may work, but compatibility is not guaranteed.
 
 ## Install the TV side
+
+For the complete customized Quiet Home stack, including six-app playback, Community Apps and TV notifications, start with the launcher's [AI installation guide](https://github.com/AnthonMS/samsung-tv-launcher/blob/codex/quietthings-playback/docs/AI-INSTALLATION.md). Use the matching development branches it lists. The original patch kit below provides base control; it does not install all of those additional components.
 
 <h4 align="center">NOTE: You must run the patch kit on the same PC you used to install QuietTizen</h4>
 
@@ -155,4 +159,9 @@ MIT. See [LICENSE](LICENSE).
 
 ## Experimental playback extension
 
-The development branch adds an optional playback companion for actual Moonfin/Jellyfin state and progress, stable TV entity identity across client-session changes, and conditional play/pause/stop/seek controls. The original API v1 remains unchanged. The companion is disabled by default and is not yet an accepted installed-TV release. See [experimental/playback/README.md](experimental/playback/README.md) for architecture, protocol, validation and remaining device tests.
+The development branch adds an optional playback companion for actual Moonfin/Jellyfin state and progress, stable TV entity identity across client-session changes, and conditional play/pause/stop/seek controls. The original API v1 remains unchanged. The companion is disabled by default for new HA configurations. The custom development stack has passed the documented checks on the owner's TV; it is not a general installed-TV release. See [experimental/playback/README.md](experimental/playback/README.md) for architecture, protocol, validation and remaining device tests.
+## Optional Quiet Home notifications
+
+The custom Quiet Home development companion can advertise notification capabilities in addition to playback. This working copy adds `quietthings.notify`, `quietthings.dismiss_notification` and `quietthings_notification_action` events. They require the optional playback port and the compatible custom TV build. Stock QuietThings/QuietTizen do not gain an overlay from the HA change alone.
+
+Home Assistant sends title/message, a live camera preview or bounded URL image/GIF and optional named buttons to the TV. Navigation is captured automatically; OK/dismiss is selected first and closing the notice returns input to the app. Images are resized in HA, so camera URLs and credentials never reach the TV. Buttons emit explicit, expiring events rather than executing HA services on the TV. A persisted cursor prevents replay after restart. The service requires an explicit QuietThings configuration entry ID. See [notification services](custom_components/quietthings/services.yaml) and the launcher's `docs/NOTIFICATIONS.md` for examples and limits. The optional package [doorbell-tv.yaml](examples/doorbell-tv.yaml) demonstrates the doorbell trigger and explicit lock callback; the integration itself does not install automations.

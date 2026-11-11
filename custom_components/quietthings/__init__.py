@@ -26,6 +26,7 @@ from .const import (
 )
 from .coordinator import ApiCoordinator, StockCoordinator
 from .playback import PlaybackApi, PlaybackCoordinator
+from .notifications import NotificationClient, TvNotifications, async_register_services
 from .stock import StockTv
 
 PLATFORMS = [Platform.MEDIA_PLAYER, Platform.SELECT, Platform.SENSOR]
@@ -40,6 +41,7 @@ class QuietThingsData:
     stock_coordinator: StockCoordinator
     api_coordinator: ApiCoordinator
     playback_coordinator: PlaybackCoordinator | None = None
+    notifications: TvNotifications | None = None
 
 
 type QuietThingsConfigEntry = ConfigEntry[QuietThingsData]
@@ -78,16 +80,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: QuietThingsConfigEntry) 
     await api_coordinator.async_refresh()
 
     playback_coordinator = None
+    notifications = None
     if port := entry.options.get(CONF_PLAYBACK_PORT, 0):
         playback_api = PlaybackApi(session, data[CONF_HOST], port, data[CONF_API_TOKEN])
         playback_coordinator = PlaybackCoordinator(
             hass, entry, playback_api, timedelta(seconds=interval)
         )
         await playback_coordinator.async_refresh()
+        notifications = TvNotifications(
+            hass, entry, NotificationClient(session, data[CONF_HOST], port, data[CONF_API_TOKEN])
+        )
+        await notifications.start()
 
     entry.runtime_data = QuietThingsData(
-        stock, api, stock_coordinator, api_coordinator, playback_coordinator
+        stock, api, stock_coordinator, api_coordinator, playback_coordinator, notifications
     )
+    async_register_services(hass)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
 

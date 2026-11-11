@@ -46,6 +46,7 @@ class PlaybackSample:
     observed_at: datetime
     position_updated_at: datetime | None
     commands: frozenset[str]
+    app_name: str | None = None
 
     def fresh(self, now: datetime | None = None) -> bool:
         age = ((now or datetime.now(UTC)) - self.observed_at).total_seconds()
@@ -69,6 +70,11 @@ def parse_sample(body: dict[str, Any]) -> PlaybackSample:
     app = data.get("app_id")
     if app is not None and (not isinstance(app, str) or not app or len(app) > 256):
         raise ValueError("Invalid app identity")
+    app_name = data.get("app_name")
+    if app_name is not None and (
+        not isinstance(app_name, str) or not app_name.strip() or len(app_name) > 128
+    ):
+        raise ValueError("Invalid app name")
     commands = data.get("commands", [])
     if not isinstance(commands, list) or any(
         not isinstance(c, str) or c not in COMMANDS for c in commands
@@ -98,6 +104,7 @@ def parse_sample(body: dict[str, Any]) -> PlaybackSample:
         observed,
         timestamp(data.get("position_updated_at")) if media else None,
         frozenset(commands) if media and app and adapter else frozenset(),
+        app_name,
     )
     if not sample.fresh():
         raise ValueError("Stale playback observation")

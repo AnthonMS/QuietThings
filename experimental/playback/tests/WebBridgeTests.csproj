@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net6.0</TargetFramework><UseAppHost>false</UseAppHost><EnableDefaultCompileItems>false</EnableDefaultCompileItems><ImplicitUsings>enable</ImplicitUsings></PropertyGroup>
+  <ItemGroup><Compile Include="../bridge/TwitchInspector.cs" Link="TwitchInspector.cs"/><Compile Include="WebBridgeTests.cs"/></ItemGroup>
+  <ItemGroup><EmbeddedResource Include="../web/media-probe.js" LogicalName="media-probe.js"/></ItemGroup>
+  <ItemGroup><EmbeddedResource Include="../web/kick-context.js" LogicalName="kick-context.js"/></ItemGroup>
+  <ItemGroup><EmbeddedResource Include="../web/twitch-context.js" LogicalName="twitch-context.js"/></ItemGroup>
+</Project>

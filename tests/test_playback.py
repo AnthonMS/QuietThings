@@ -76,6 +76,38 @@ async def test_actual_state(hass, mock_tv, config_entry, aioclient_mock, state):
         assert media.attributes["media_content_type"] == "movie"
 
 
+@pytest.mark.parametrize("app,adapter", [("Jz7aUrV2Q4.Twitch", "twitch-web-player"), ("CrKckTV001.KickTV", "kicktv-web-player")])
+@pytest.mark.parametrize("state", ["playing", "paused"])
+async def test_live_web_app_without_title_or_vod_duration(
+    hass, mock_tv, config_entry, aioclient_mock, state, app, adapter
+):
+    await setup_playback(
+        hass,
+        config_entry,
+        aioclient_mock,
+        body(
+            state,
+            app_id=app,
+            adapter=adapter,
+            title=None,
+            media_type="Video",
+            duration_seconds=None,
+            commands=["play", "pause"],
+        ),
+    )
+    media = hass.states.get(MP)
+    assert media.state == state
+    assert media.attributes["app_id"] == app
+    assert media.attributes["media_content_type"] == "video"
+    assert "media_title" not in media.attributes
+    assert "media_duration" not in media.attributes
+    features = media.attributes["supported_features"]
+    assert features & MediaPlayerEntityFeature.PLAY
+    assert features & MediaPlayerEntityFeature.PAUSE
+    assert not features & MediaPlayerEntityFeature.SEEK
+    assert not features & MediaPlayerEntityFeature.STOP
+
+
 async def test_hardware_off_clears_stale_playback(
     hass, mock_tv, config_entry, aioclient_mock
 ):
@@ -294,3 +326,19 @@ async def test_media_expires_without_waiting_for_a_long_poll(
     await hass.async_block_till_done()
     assert hass.states.get(MP).state == "on"
     assert "media_title" not in hass.states.get(MP).attributes
+
+@pytest.mark.parametrize("app_name", ["YouTube", "TizenTube"])
+async def test_confirmed_menu_retains_app_name_without_media(hass, mock_tv, config_entry, aioclient_mock, app_name):
+    await setup_playback(hass, config_entry, aioclient_mock, body(
+        "idle", app_id="com.samsung.tv.cobalt-yt", app_name=app_name, adapter="cobalt-player"))
+    media = hass.states.get(MP)
+    assert media.state == "idle"
+    assert media.attributes["app_name"] == app_name
+    assert "media_title" not in media.attributes
+    assert "media_position" not in media.attributes
+    assert not media.attributes["supported_features"] & MediaPlayerEntityFeature.PLAY
+
+@pytest.mark.parametrize("name", [1, "", " " , "x" * 129])
+def test_invalid_app_name_rejected(name):
+    with pytest.raises(ValueError, match="app name"):
+        parse_sample(body("idle", app_name=name))

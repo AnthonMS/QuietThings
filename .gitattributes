@@ -1,1 +1,2 @@
 *.sh text eol=lf
+experimental/playback/bridge/*.sh text eol=lf

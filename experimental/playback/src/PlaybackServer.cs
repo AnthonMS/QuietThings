@@ -19,13 +19,19 @@ public sealed class PlaybackServer : IDisposable
 {
     readonly PlaybackAgent agent;
     readonly Func<string> readToken;
+    readonly Func<JsonElement,CancellationToken,Task<object>> notifications;
+    readonly Func<bool> accessEnabled;
+    readonly Func<long,CancellationToken,Task<object>> notificationEvents;
+    readonly Func<JsonElement,CancellationToken,Task<object>> dismissNotification;
+    readonly Func<JsonElement,CancellationToken,Task<object>> notificationImage;
+    readonly Func<CancellationToken,Task<object>> notificationStatus;
     readonly TcpListener listener;
     readonly CancellationTokenSource lifetime = new CancellationTokenSource();
     Task run;
     long rateWindow;
     int rateCount;
     public int Port => ((IPEndPoint)listener.LocalEndpoint).Port;
-    public PlaybackServer(PlaybackAgent source, Func<string> token, int port = 18766, IPAddress bind = null) { agent = source; readToken = token; listener = new TcpListener(bind ?? IPAddress.Any, port); }
+    public PlaybackServer(PlaybackAgent source, Func<string> token, int port = 18766, IPAddress bind = null, Func<JsonElement,CancellationToken,Task<object>> notifications = null,Func<bool> accessEnabled=null,Func<long,CancellationToken,Task<object>> notificationEvents=null,Func<JsonElement,CancellationToken,Task<object>> dismissNotification=null,Func<JsonElement,CancellationToken,Task<object>> notificationImage=null,Func<CancellationToken,Task<object>> notificationStatus=null) { agent = source; readToken = token;this.notifications=notifications;this.accessEnabled=accessEnabled??(()=>true);this.notificationEvents=notificationEvents;this.dismissNotification=dismissNotification;this.notificationImage=notificationImage;this.notificationStatus=notificationStatus; listener = new TcpListener(bind ?? IPAddress.Any, port); }
     public void Start() { if (run != null) throw new InvalidOperationException("Already started"); listener.Start(4); run = Run(); }
     async Task Run()
     {
@@ -48,13 +54,40 @@ public sealed class PlaybackServer : IDisposable
         var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var line in lines) { if (line == lines[0] || line == "") continue; int colon = line.IndexOf(':'); if (colon <= 0 || !headers.TryAdd(line.Substring(0, colon).Trim(), line.Substring(colon + 1).Trim())) { await Reply(stream, 400, new { ok = false, error = "ambiguous header" }, ct); return; } }
         if (headers.ContainsKey("Transfer-Encoding")) { await Reply(stream, 400, new { ok = false, error = "transfer encoding unsupported" }, ct); return; }
-        if (!headers.TryGetValue("Authorization", out var auth) || !Authorized(auth, readToken())) { await Reply(stream, 401, new { ok = false, error = "unauthorized" }, ct); return; }
+        int length=0;if(headers.TryGetValue("Content-Length",out var raw)&&(!int.TryParse(raw,NumberStyles.None,CultureInfo.InvariantCulture,out length)||length<0)){await Reply(stream,413,new{ok=false,error="invalid body length"},ct);return;}
+        async Task Reject(int code,object error){
+            await Reply(stream,code,error,ct);int left=Math.Min(length,262144);var discard=new byte[4096];
+            try{while(left>0){int n=await stream.ReadAsync(discard.AsMemory(0,Math.Min(left,discard.Length)),inputTimeout.Token);if(n==0)break;left-=n;}}catch{}
+        }
+        if (!headers.TryGetValue("Authorization", out var auth) || !Authorized(auth, readToken())) { await Reject(401,new { ok = false, error = "unauthorized" }); return; }
+        if(!accessEnabled()){await Reject(503,new{ok=false,error="Local Home Assistant access disabled"});return;}
         long now = Environment.TickCount64; if (now - rateWindow >= 1000) { rateWindow = now; rateCount = 0; }
-        if (++rateCount > 4) { await Reply(stream, 429, new { ok = false, error = "rate limited" }, ct); return; }
-        int length = 0; if (headers.TryGetValue("Content-Length", out var raw) && (!int.TryParse(raw, NumberStyles.None, CultureInfo.InvariantCulture, out length) || length < 0 || length > 1024)) { await Reply(stream, 413, new { ok = false, error = "body too large or invalid" }, ct); return; }
+        if (++rateCount > 8) { await Reject(429,new { ok = false, error = "rate limited" }); return; }
+        int maxBody=first[1]=="/v1/notifications"?1500000:first[1]=="/v1/notifications/image"?262144:1024;
+        if(length>maxBody){await Reject(413,new{ok=false,error="body too large"});return;}
         var body = new byte[length]; int got = 0; while (got < length) { int n = await stream.ReadAsync(body.AsMemory(got), inputTimeout.Token); if (n == 0) return; got += n; }
         string method = first[0], path = first[1];
-        if (path == "/v1/capabilities" && method == "GET") { await Reply(stream, 200, new { ok = true, extension = "quietthings-playback", extension_version = 1, adapters = agent.AdapterNames, apps = false, transport = true }, ct); return; }
+        if(path=="/v1/notifications/status"&&method=="GET"&&notificationStatus!=null){await Reply(stream,200,await notificationStatus(ct).ConfigureAwait(false),ct);return;}
+        if(path=="/v1/notifications/image"&&method=="POST"&&notificationImage!=null){
+            try{using var document=JsonDocument.Parse(body,new JsonDocumentOptions{MaxDepth=3});await Reply(stream,200,await notificationImage(document.RootElement,ct).ConfigureAwait(false),ct);}
+            catch(JsonException){await Reply(stream,400,new{ok=false,error="invalid live notification frame"},ct);}
+            catch{await Reply(stream,503,new{ok=false,error="notification image unavailable"},ct);}return;
+        }
+        if(method=="GET"&&notificationEvents!=null&&(path=="/v1/notifications/events"||path.StartsWith("/v1/notifications/events?after=",StringComparison.Ordinal))) {
+            long after=0;if(path.Contains('?')&&(!long.TryParse(path.Substring("/v1/notifications/events?after=".Length),NumberStyles.None,CultureInfo.InvariantCulture,out after)||after<0)){await Reply(stream,400,new{ok=false,error="invalid event cursor"},ct);return;}
+            await Reply(stream,200,await notificationEvents(after,ct).ConfigureAwait(false),ct);return;
+        }
+        if(path=="/v1/notifications/dismiss"&&method=="POST"&&dismissNotification!=null) {
+            try{using var document=JsonDocument.Parse(body,new JsonDocumentOptions{MaxDepth=3});await Reply(stream,200,await dismissNotification(document.RootElement,ct).ConfigureAwait(false),ct);}
+            catch(JsonException){await Reply(stream,400,new{ok=false,error="invalid notification identity"},ct);}return;
+        }
+        if(path=="/v1/notifications"&&method=="POST"&&notifications!=null) {
+            try{using var document=JsonDocument.Parse(body,new JsonDocumentOptions{MaxDepth=5});await Reply(stream,200,await notifications(document.RootElement,ct).ConfigureAwait(false),ct);}
+            catch(JsonException){await Reply(stream,400,new{ok=false,error="invalid notification"},ct);}
+            catch{await Reply(stream,503,new{ok=false,error="notification display unavailable"},ct);}
+            return;
+        }
+        if (path == "/v1/capabilities" && method == "GET") { await Reply(stream, 200, new { ok = true, extension = "quietthings-playback", extension_version = 1, adapters = agent.AdapterNames, apps = false, transport = true, notifications=notifications!=null,notification_actions=notificationEvents!=null,notification_images=notifications!=null,notification_media_version=2,notification_live_images=notificationImage!=null,notification_gif=notifications!=null }, ct); return; }
         if (path == "/v1/playback" && method == "GET")
         {
             try { var sample = await agent.Refresh(ct).ConfigureAwait(false); await Reply(stream, 200, new { ok = true, extension_version = 1, playback = Wire(sample) }, ct); }
@@ -79,7 +112,7 @@ public sealed class PlaybackServer : IDisposable
         token = token?.Trim(); if (token == null || token.Length < 16 || token.Length > 256 || auth == null || !auth.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)) return false;
         return CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(auth.Substring(7)), Encoding.UTF8.GetBytes(token));
     }
-    public static object Wire(PlaybackSnapshot s) => new { app_id = s.AppId, state = s.State, adapter = s.Adapter, title = s.Title, media_type = s.MediaType, position_seconds = s.PositionSeconds, duration_seconds = s.DurationSeconds, observed_at = s.ObservedAt.ToUniversalTime().ToString("O"), position_updated_at = s.PositionUpdatedAt?.ToUniversalTime().ToString("O"), commands = s.Commands };
+    public static object Wire(PlaybackSnapshot s) => new { app_id = s.AppId, app_name = s.AppName, state = s.State, adapter = s.Adapter, title = s.Title, media_type = s.MediaType, position_seconds = s.PositionSeconds, duration_seconds = s.DurationSeconds, observed_at = s.ObservedAt.ToUniversalTime().ToString("O"), position_updated_at = s.PositionUpdatedAt?.ToUniversalTime().ToString("O"), commands = s.Commands };
     static async Task Reply(NetworkStream stream, int status, object body, CancellationToken ct)
     {
         var json = JsonSerializer.SerializeToUtf8Bytes(body); string reason = status == 200 ? "OK" : status == 401 ? "Unauthorized" : "Request Failed";

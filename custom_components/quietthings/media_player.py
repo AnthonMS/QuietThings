@@ -166,6 +166,19 @@ class QuietThingsMediaPlayer(CoordinatorEntity[StockCoordinator], MediaPlayerEnt
         return sample.app_id if (sample := self._playback_sample) else None
 
     @property
+    def app_name(self) -> str | None:
+        if not (sample := self._playback_sample):
+            return None
+        return sample.app_name or {
+            "com.samsung.tv.bixby-promotion": "Quiet Home",
+            "MoonfinApp.moonfin": "Moonfin",
+            "AprZAARz4r.Jellyfin": "Jellyfin",
+            "Jz7aUrV2Q4.Twitch": "Twitch",
+            "CrKckTV001.KickTV": "KickTV",
+            "com.samsung.tv.cobalt-yt": "YouTube / TizenTube",
+        }.get(sample.app_id)
+
+    @property
     def media_title(self) -> str | None:
         return sample.title if (sample := self._playback_sample) else None
 

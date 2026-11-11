@@ -13,6 +13,7 @@ notes/*
 # Build output and secrets
 bin/
 obj/
+node_modules/
 *.dll
 *.token
 

@@ -23,5 +23,30 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '6.0.x'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
       - run: dotnet run --project experimental/playback/tests/PlaybackTests.csproj
       - run: dotnet run --project kit/tests/LanApiTests.csproj
+      - run: dotnet run --project experimental/playback/tests/WebBridgeTests.csproj
+      - run: dotnet run --project experimental/playback/tests/CobaltObserverTests.csproj
+      - run: dotnet run --project experimental/playback/tests/CobaltLaunchTests.csproj
+      - run: dotnet run --project experimental/playback/tests/JellyfinCommandTests.csproj
+      - run: dotnet run --project experimental/playback/tests/TvNotificationTests.csproj
+      - run: dotnet run --project experimental/playback/tests/ManagedRecoveryFilesTests.csproj
+      - run: dotnet build experimental/playback/bridge/Bridge.csproj --nologo -o .local/twitch-bridge-build
+      - run: python -m unittest discover -s experimental/playback/tests -p 'test_*.py' -v
+  web-media-probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node experimental/playback/tests/web-media-probe.test.cjs
+      - run: node experimental/playback/tests/kick-context.test.cjs
+      - run: node experimental/playback/tests/twitch-context.test.cjs
+      - run: node experimental/playback/tests/cobalt-client.test.cjs
+      - run: node experimental/playback/tests/cobalt-proxy.test.cjs
+      - run: npm ci --prefix experimental/playback/web
+      - run: npm run bundle --prefix experimental/playback/web
