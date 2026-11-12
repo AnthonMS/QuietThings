@@ -100,7 +100,7 @@ The integration creates one device per TV.
 ## Behavior and limitations
 
 - The select entity and both sensors are unavailable if the most recent QuietThings API `/state` request failed.
-- The media player remains available for power control. A loss of communication with the stock port is reported as unknown; it does not prove that the TV is off. The media player becomes unavailable only after 3 consecutive failed stock polls while the API is also down and no valid native display observation is available.
+- The media player remains available for power control. A loss of communication with the stock port is reported as unknown; it does not prove that the TV is off. The media player stays available as a Wake-on-LAN command target even when all TV endpoints sleep. Its state is unknown when power cannot be observed. Volume/source data and playback are not invented while offline. Toggle checks current power and attempts wake for off or unknown, rather than treating unknown as a power-off request.
 - The integration checks the API version during setup. A TV reporting a different version is not accepted.
 - Keep the API token private. Do not paste it into chats, logs, or issues. Diagnostic downloads redact it.
 - The API allows approximately 4 requests per second. Requests exceeding this rate receive a 429 response.
@@ -172,3 +172,6 @@ Home Assistant sends title/message, a live camera preview or bounded URL image/G
 A matching Quiet Home build offers authenticated GET `/power` on the existing control port. It reads the native Tizen display state, reports `power` (`on`, `off` or `unknown`), `power_source: tizen-display` and a timezone-qualified `observed_at`. The integration validates source, value and freshness before preferring it over Samsung REST, including power-command guards. Legacy hosts returning 404 and unknown/error observations retain stock fallback. The media player exposes `power_source` and `samsung_power_state` for diagnosis.
 
 This addresses a reproduced Samsung standby report while the panel and YouTube were actually on. Two digital-remote off/on cycles passed on the development TV, including 45-second standby. Native off also clears background media. This is not certification of all sleep durations, firmware or network wake conditions. For a universal media player, configure its state and power command authority to this QuietThings entity; leaving Samsung as its explicit state authority bypasses the correction. The existing token and trusted-LAN security boundaries remain unchanged.
+
+
+When wrapping this entity in a universal player, forward its `toggle` command explicitly to `media_player.toggle` on the QuietThings entity, as well as forwarding turn_on/turn_off. HA's default universal toggle otherwise treats an unknown state as turn_off. Use QuietThings for `volume_level`, `is_volume_muted` and the volume commands too; a Samsung child reporting stale off may still accept volume writes while omitting its readback attributes. Other universal controls can keep their existing routes.

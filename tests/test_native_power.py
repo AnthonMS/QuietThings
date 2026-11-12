@@ -75,3 +75,53 @@ async def test_native_failure_falls_back_to_original_stock_state(hass):
     tv=StockTv(async_get_clientsession(hass),HOST,MAC,"192.0.2.255",display_power=AsyncMock(side_effect=QuietThingsUnavailable("asleep")))
     with patch.object(tv,"device_info",AsyncMock(return_value={"PowerState":"Standby"})):
         assert await tv.power_state()=="standby"
+
+
+async def test_toggle_uses_fresh_panel_state_instead_of_stale_entity(hass, mock_tv, setup_integration):
+    mock_tv.display_power = "on"
+    await setup_integration()
+    mock_tv.display_power = "off"
+    with patch("custom_components.quietthings.stock.StockTv.power_on", new=AsyncMock()) as on, patch("custom_components.quietthings.stock.StockTv.power_off", new=AsyncMock()) as off:
+        await hass.services.async_call("media_player", "toggle", {"entity_id": MP}, blocking=True)
+    on.assert_awaited_once()
+    off.assert_not_awaited()
+
+
+async def test_volume_patch_preserves_playback_and_authoritative_power(hass, mock_tv, config_entry, aioclient_mock):
+    mock_tv.power = "standby"
+    mock_tv.display_power = "on"
+    await setup_playback(hass, config_entry, aioclient_mock, body("playing"))
+    before = hass.states.get(MP)
+    await hass.services.async_call("media_player", "volume_set", {"entity_id": MP, "volume_level": 0.12}, blocking=True)
+    state = hass.states.get(MP)
+    assert state.state == "playing"
+    assert state.attributes["volume_level"] == 0.12
+    assert state.attributes["media_title"] == before.attributes["media_title"]
+    assert state.attributes["power_source"] == "tizen-display"
+
+
+async def test_universal_remote_keeps_volume_and_wake_after_sleep(hass, mock_tv, setup_integration):
+    from homeassistant.setup import async_setup_component
+    assert await async_setup_component(hass, "media_player", {"media_player": [{
+        "platform": "universal", "name": "Dashboard TV", "children": [MP],
+        "attributes": {"state": MP, "volume_level": MP + "|volume_level"},
+        "commands": {action: {"action": "media_player." + action, "target": {"entity_id": MP}}
+                     for action in ("turn_on", "turn_off", "toggle")},
+    }]})
+    mock_tv.power = "standby"
+    mock_tv.display_power = "on"
+    entry = await setup_integration()
+    await hass.async_block_till_done()
+    dashboard = "media_player.dashboard_tv"
+    assert hass.states.get(dashboard).state == "on"
+    assert hass.states.get(dashboard).attributes["volume_level"] == 0.2
+    mock_tv.stock_down = mock_tv.api_down = True
+    mock_tv.display_power = None
+    await entry.runtime_data.api_coordinator.async_refresh()
+    for _ in range(4):
+        await entry.runtime_data.stock_coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert hass.states.get(dashboard).state == "unknown"
+    with patch("custom_components.quietthings.stock.StockTv.power_on", new=AsyncMock()) as on:
+        await hass.services.async_call("media_player", "toggle", {"entity_id": dashboard}, blocking=True)
+    on.assert_awaited_once()

@@ -125,9 +125,9 @@ class QuietThingsMediaPlayer(CoordinatorEntity[StockCoordinator], MediaPlayerEnt
 
     @property
     def available(self) -> bool:
-        return not (
-            self.coordinator.lost and not self._api_coordinator.last_update_success
-        )
+        # WoL is a local command and must remain callable when the TV sleeps.
+        # Unknown power stays unknown; input/volume properties still require API data.
+        return True
 
     @property
     def state(self) -> MediaPlayerState | None:
@@ -262,6 +262,14 @@ class QuietThingsMediaPlayer(CoordinatorEntity[StockCoordinator], MediaPlayerEnt
         if port not in HDMI_PORTS:
             return None
         return self.source_list[port - 1]
+
+    async def async_toggle(self) -> None:
+        # HA's default treats unknown as turn_off. An unreachable sleeping TV
+        # needs a wake attempt instead, with the existing native/stock guards.
+        if await self._stock.power_state() == "on":
+            await self.async_turn_off()
+        else:
+            await self.async_turn_on()
 
     async def async_turn_on(self) -> None:
         try:

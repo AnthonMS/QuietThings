@@ -302,7 +302,7 @@ async def test_stock_loss_is_unknown_when_api_remains_reachable(hass, mock_tv, s
     assert hass.states.get(SEL).state == "HDMI 2"
 
 
-async def test_unavailable_only_when_stock_lost_3_polls_and_api_down(hass, mock_tv, setup_integration):
+async def test_wake_remains_callable_when_stock_and_api_are_asleep(hass, mock_tv, setup_integration):
     entry = await setup_integration()
     mock_tv.stock_down = True
     mock_tv.api_down = True
@@ -311,7 +311,12 @@ async def test_unavailable_only_when_stock_lost_3_polls_and_api_down(hass, mock_
     await refresh(hass, entry, "stock")
     assert hass.states.get(MP).state == "unknown"
     await refresh(hass, entry, "stock")
-    assert hass.states.get(MP).state == "unavailable"
+    assert hass.states.get(MP).state == "unknown"
+    assert hass.states.get(MP).attributes.get("volume_level") is None
+    with patch("custom_components.quietthings.stock.StockTv.power_on", new=AsyncMock()) as on:
+        await call(hass, "media_player", "turn_on", entity_id=MP)
+        await call(hass, "media_player", "toggle", entity_id=MP)
+    assert on.await_count == 2
 
     mock_tv.stock_down = False
     await refresh(hass, entry, "stock")
